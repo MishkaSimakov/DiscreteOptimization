@@ -49,9 +49,9 @@ class MILP {
     auto optimized = optimizer.apply(milp_problem);
     auto matrices = to_matrices(optimized);
 
-    auto solver = FullStrongBranchingBranchAndBound(
-        matrices.A, matrices.b, matrices.c, matrices.lower, matrices.upper,
-        matrices.variables);
+    auto solver =
+        FullStrongBranchingBranchAndBound(matrices.A, matrices.b, matrices.c,
+                                          matrices.bounds, matrices.variables);
     auto result = solver.solve();
 
     auto* solution = std::get_if<FiniteMILPSolution<double>>(&result.solution);

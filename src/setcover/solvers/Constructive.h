@@ -5,171 +5,169 @@
 #include <chrono>
 #include <numeric>
 #include <queue>
+#include <random>
 #include <span>
 #include <vector>
 
+#include "linear/matrix/Matrix.h"
+#include "linear/model/LP.h"
+#include "linear/simplex/Settings.h"
+#include "linear/simplex/Simplex.h"
+#include "setcover/CoveringSetsPack.h"
 #include "setcover/Evaluator.h"
 #include "setcover/Types.h"
+#include "utils/Accumulators.h"
+#include "utils/GraphvizDrawer.h"
 
 namespace setcover {
 
-class CoveringSetsPack {
-  const Problem& problem_;
+struct Node {
+  size_t id;
 
-  std::vector<size_t> sets_;
-  std::vector<size_t> begins_;
+  // Хранит фиксированные решения для данной вершины дерева
+  // Пара (i, 0) означает, что мы не берём i-е множество,
+  // а пара (i, 1), что берём
+  std::vector<std::pair<size_t, bool>> decisions;
 
-  std::vector<bool> mask_;
-  std::vector<size_t> current_sizes_;
+  // нижняя оценка на решение в поддереве этой вершины
+  double lower_bound;
+
+  // верхняя оценка на решение, получается дополнением решения с помощью
+  // жадного алгоритма
+  size_t upper_bound;
+
+  // Множество, по которому будет происходить разделение в данной вершине
+  size_t branch_set;
+};
+
+template <typename Comparator>
+class PriorityNodesQueue {
+  std::vector<Node> heap_;
+
+  [[no_unique_address]]
+  Comparator comparator_;
 
  public:
-  explicit CoveringSetsPack(const Problem& problem)
-      : problem_(problem),
-        begins_(problem.elements_count + 1),
-        mask_(problem.elements_count, true),
-        current_sizes_(problem.sets.size()) {
-    for (size_t i = 0; i < problem.elements_count; ++i) {
-      begins_[i] = sets_.size();
+  void push(Node node) {
+    heap_.push_back(std::move(node));
+    std::push_heap(heap_.begin(), heap_.end(), comparator_);
+  }
 
-      for (size_t j = 0; j < problem.sets.size(); ++j) {
-        if (problem.sets[j].elements.contains(i)) {
-          sets_.push_back(j);
-        }
-      }
+  std::optional<Node> pop() {
+    if (heap_.empty()) {
+      return std::nullopt;
     }
 
-    begins_[problem.elements_count] = sets_.size();
+    std::pop_heap(heap_.begin(), heap_.end(), comparator_);
 
-    for (size_t i = 0; i < problem.sets.size(); ++i) {
-      current_sizes_[i] = problem.sets[i].elements.size();
+    Node node = std::move(heap_.back());
+    heap_.pop_back();
+
+    return std::move(node);
+  }
+};
+
+// Первой выбирается вершина с наименьшим lower_bound
+struct LowerBoundNodeComparator {
+  bool operator()(const Node& x, const Node& y) const {
+    return x.lower_bound > y.lower_bound;
+  }
+};
+
+// Первой выбирается самая неглубокая вершина
+struct BreadthNodeComparator {
+  bool operator()(const Node& x, const Node& y) const {
+    return x.decisions.size() > y.decisions.size();
+  }
+};
+
+// Первой выбирается вершина с наилучшим жадным решением
+struct BestUpperBoundNodeComparator {
+  bool operator()(const Node& x, const Node& y) const {
+    return x.upper_bound > y.upper_bound;
+  }
+};
+
+template <typename Comparator>
+class PriorityWithDFSNodesQueue {
+  std::vector<Node> heap_;
+
+  [[no_unique_address]]
+  Comparator comparator_;
+
+  std::optional<Node> lifo_slot_;
+
+  void push_to_heap(Node node) {
+    heap_.push_back(std::move(node));
+    std::push_heap(heap_.begin(), heap_.end(), comparator_);
+  }
+
+ public:
+  void push(Node node) {
+    if (!lifo_slot_) {
+      lifo_slot_ = std::move(node);
+    } else if (comparator_(*lifo_slot_, node)) {
+      push_to_heap(std::move(*lifo_slot_));
+      lifo_slot_ = std::move(node);
+    } else {
+      push_to_heap(std::move(node));
     }
   }
 
-  void cover_element(size_t element) {
-    if (mask_[element]) {
-      mask_[element] = false;
+  std::optional<Node> pop() {
+    if (lifo_slot_) {
+      Node node = std::move(*lifo_slot_);
+      lifo_slot_ = std::nullopt;
 
-      for (size_t i = begins_[element]; i < begins_[element + 1]; ++i) {
-        --current_sizes_[sets_[i]];
-      }
-    }
-  }
-
-  bool is_covered(size_t element) const { return mask_[element]; }
-
-  std::span<const size_t> get_covering_sets(size_t element) const {
-    return std::span{sets_.begin() + begins_[element],
-                     sets_.begin() + begins_[element + 1]};
-  }
-
-  std::optional<size_t> max_cost_set() const {
-    double max_cost_value = 0;
-    size_t max_cost_index = 0;
-
-    for (size_t i = 0; i < problem_.sets.size(); ++i) {
-      double value = static_cast<double>(current_sizes_[i]) /
-                     static_cast<double>(problem_.sets[i].cost);
-
-      if (value > max_cost_value) {
-        max_cost_value = value;
-        max_cost_index = i;
-      }
+      return std::move(node);
     }
 
-    return max_cost_value > 0 ? std::optional{max_cost_index} : std::nullopt;
-  }
-
-  void reset() {
-    std::ranges::fill(mask_, true);
-
-    for (size_t i = 0; i < problem_.sets.size(); ++i) {
-      current_sizes_[i] = problem_.sets[i].elements.size();
+    if (heap_.empty()) {
+      return std::nullopt;
     }
+
+    std::pop_heap(heap_.begin(), heap_.end(), comparator_);
+
+    Node node = std::move(heap_.back());
+    heap_.pop_back();
+
+    return std::move(node);
   }
 };
 
 class Constructive {
-  struct Node {
-    // уже принятые решения
-    // 0 - не взяли множество, 1 - взяли
-    std::vector<bool> decisions;
-
-    // нижняя оценка на решение в поддереве этой вершины
-    double lower_bound;
-
-    // верхняя оценка на решение, получается дополнением решения с помощью
-    // жадного алгоритма
-    size_t upper_bound;
-  };
-
-  // Первой выбирается вершина с наименьшим lower_bound
-  struct LowerBoundNodeComparator {
-    bool operator()(const Node& x, const Node& y) const {
-      return x.lower_bound > y.lower_bound;
-    }
-  };
-
-  // Первой выбирается самая неглубокая вершина
-  struct BreadthNodeComparator {
-    bool operator()(const Node& x, const Node& y) const {
-      return x.decisions.size() > y.decisions.size();
-    }
-  };
-
-  // Первой выбирается вершина с наилучшим жадным решением
-  struct BestGreedyNode {
-    bool operator()(const Node& x, const Node& y) const {
-      return x.upper_bound > y.upper_bound;
-    }
-  };
-
   const Problem& problem_;
   std::chrono::milliseconds time_limit_;
 
   // Всякие статистики
   size_t nodes_visited_{0};
 
-  // Порядок, в котором перебираются множества.
-  // sets_order_[0] - индекс множества, которое будет рассмотрено первым
-  std::vector<size_t> sets_order_;
-
-  // Наверху кучи лежит вершина с наименьшим lower_bound
-  std::priority_queue<Node, std::vector<Node>, BestGreedyNode> queue_;
+  PriorityNodesQueue<BestUpperBoundNodeComparator> queue_;
   std::optional<std::pair<Solution, size_t>> incumbent_;
 
   CoveringSetsPack pack_;
 
-  static std::vector<size_t> get_sets_order(const Problem& problem) {
-    std::vector<size_t> result(problem.sets.size());
-    std::iota(result.begin(), result.end(), 0);
-
-    std::ranges::sort(result, {}, [&problem](size_t index) {
-      return -static_cast<int>(problem.sets[index].elements.size());
-    });
-
-    return std::move(result);
-  }
+  // GraphvizDrawer drawer_;
 
   // Использует жадный алгоритм, чтобы найти какое-то решение, согласованное с
   // decisions. Решение может покрывать не все элементы. Тогда в поддереве нет
   // допустимых решений.
-  Solution finish_solution(const std::vector<bool>& decisions) {
+  // Также возвращает индекс множества, которое жадный алгоритм добавил первым,
+  // или std::nullopt, если жадный алгоритм ничего не добавил
+  std::pair<Solution, std::optional<size_t>> finish_solution(
+      std::span<const std::pair<size_t, bool>> decisions) {
     pack_.reset();
 
     std::vector<size_t> result;
+    std::optional<size_t> first_greedy = std::nullopt;
 
     // Применяем уже сделанные решения
-    for (size_t i = 0; i < decisions.size(); ++i) {
-      size_t set_index = sets_order_[i];
-
-      if (decisions[i]) {
-        // взяли множество sets_order_[i], надо убрать из оставшихся его
-        // элементы
+    for (auto [set_index, decision] : decisions) {
+      if (decision) {
         result.push_back(set_index);
-
-        for (size_t element : problem_.sets[set_index].elements) {
-          pack_.cover_element(element);
-        }
+        pack_.cover_set(set_index);
+      } else {
+        pack_.remove_set(set_index);
       }
     }
 
@@ -181,74 +179,56 @@ class Constructive {
         break;
       }
 
-      result.push_back(*chosen_set);
-
-      for (size_t element : problem_.sets[*chosen_set].elements) {
-        pack_.cover_element(element);
+      if (!first_greedy.has_value()) {
+        first_greedy = chosen_set->first;
       }
+
+      result.push_back(chosen_set->first);
+      pack_.cover_set(chosen_set->first);
     }
 
-    return Solution{std::move(result)};
+    return {Solution{std::move(result)}, first_greedy};
   }
 
-  std::optional<Node> pop_node() {
-    if (queue_.empty()) {
-      return std::nullopt;
-    }
-
-    auto node = queue_.top();
-    queue_.pop();
-
-    return std::move(node);
+  double get_lower_bound(std::span<const std::pair<size_t, bool>> decisions) {
+    return 0;
   }
 
-  double get_lower_bound(const std::vector<bool>& decisions) {
-    pack_.reset();
-
-    double result = 0;
-
-    for (size_t i = 0; i < decisions.size(); ++i) {
-      if (decisions[i]) {
-        for (size_t element : problem_.sets[sets_order_[i]].elements) {
-          pack_.cover_element(element);
-        }
-
-        result += static_cast<double>(problem_.sets[sets_order_[i]].cost);
-      }
-    }
-
-    // Проходим по непокрытым элементам. Для каждого считаем:
-    // min c_j / |A_j|
-
-    for (size_t i = 0; i < problem_.elements_count; ++i) {
-      if (pack_.is_covered(i)) {
-        continue;
-      }
-
-      double min = 1e10;  // +infinity
-
-      for (size_t set_index : pack_.get_covering_sets(i)) {
-        const auto& set = problem_.sets[set_index];
-        min = std::min(min, static_cast<double>(set.cost) /
-                                static_cast<double>(set.elements.size()));
-      }
-
-      result += min;
-    }
-
-    return result;
+  void add_drawer_node(size_t id, std::string label, std::string fill,
+                       const Node* parent) {
+    // drawer_.add_node({
+    //     .id = id,
+    //     .label = std::move(label),
+    //     .fill = std::move(fill),
+    // });
+    //
+    // if (parent != nullptr) {
+    //   drawer_.add_edge({
+    //       .from = parent->id,
+    //       .to = id,
+    //   });
+    // }
   }
 
-  void push_to_queue(std::vector<bool> decisions) {
+  void push_to_queue(std::vector<std::pair<size_t, bool>> decisions,
+                     const Node* parent) {
     ++nodes_visited_;
 
-    Solution solution = finish_solution(decisions);
+    auto [solution, first_greedy] = finish_solution(decisions);
 
     auto evaluation = evaluate(problem_, solution);
 
     if (!evaluation.is_valid) {
       // Решение нельзя дополнить до корректного, в соответствии с decisions.
       // Обрубаем это поддерево.
+
+      add_drawer_node(nodes_visited_, "infeasible", "red", parent);
+      return;
+    }
+
+    if (!first_greedy.has_value()) {
+      // Дошли до листа дерева
+      add_drawer_node(nodes_visited_, "leaf", "green", parent);
       return;
     }
 
@@ -259,16 +239,29 @@ class Constructive {
     double lower_bound = get_lower_bound(decisions);
 
     Node node = {
+        .id = nodes_visited_,
+
         .decisions = std::move(decisions),
         .lower_bound = lower_bound,
         .upper_bound = evaluation.score,
+
+        // разделяемся по множеству, которое было выбрано первым в жадном
+        // алгоритме
+        .branch_set = *first_greedy,
     };
 
     if (incumbent_ && incumbent_->second < node.lower_bound) {
       // В данном поддереве нет решений лучше, чем текущий кандидат.
       // Обрубаем это поддерево.
+      add_drawer_node(nodes_visited_, "bounds", "orange", parent);
+
       return;
     }
+
+    add_drawer_node(nodes_visited_,
+                    std::format("{}\nlb: {}, ub: {}", node.branch_set,
+                                node.lower_bound, node.upper_bound),
+                    "grey", parent);
 
     queue_.push(std::move(node));
   }
@@ -276,15 +269,12 @@ class Constructive {
  public:
   explicit Constructive(const Problem& problem,
                         std::chrono::milliseconds time_limit)
-      : problem_(problem),
-        time_limit_(time_limit),
-        sets_order_(get_sets_order(problem)),
-        pack_(problem) {}
+      : problem_(problem), time_limit_(time_limit), pack_(problem) {}
 
   std::optional<Solution> solve() {
     auto start_time = std::chrono::high_resolution_clock::now();
 
-    push_to_queue({});
+    push_to_queue({}, nullptr);
 
     while (true) {
       auto current_time = std::chrono::high_resolution_clock::now();
@@ -294,34 +284,31 @@ class Constructive {
         break;
       }
 
-      auto node = pop_node();
+      auto node = queue_.pop();
 
       if (!node) {
         break;
       }
 
-      // Дошли до листа дерева, переходим к следующей вершине
-      if (node->decisions.size() == problem_.sets.size()) {
-        continue;
-      }
-
       // left child
       auto left_decisions = node->decisions;
-      left_decisions.push_back(false);
+      left_decisions.emplace_back(node->branch_set, false);
 
-      push_to_queue(std::move(left_decisions));
+      push_to_queue(std::move(left_decisions), &*node);
 
       // right child
       auto right_decisions = node->decisions;
-      right_decisions.push_back(true);
+      right_decisions.emplace_back(node->branch_set, true);
 
-      push_to_queue(std::move(right_decisions));
+      push_to_queue(std::move(right_decisions), &*node);
     }
 
     return incumbent_.transform([](const auto& v) { return v.first; });
   }
 
   size_t get_visited_nodes_count() const { return nodes_visited_; }
+
+  // void draw_tree(std::ostream& os) const { drawer_.draw(os); }
 };
 
 }  // namespace setcover
