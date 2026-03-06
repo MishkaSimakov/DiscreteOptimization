@@ -3,7 +3,14 @@ project(DiscreteOptimization)
 
 set(CMAKE_CXX_STANDARD 23)
 
-add_subdirectory(lib/raspisator)
+include(FetchContent)
+FetchContent_Declare(
+        raspisator
+        GIT_REPOSITORY https://github.com/MishkaSimakov/raspisator.git
+        GIT_TAG 2f0f74adc1886796e630c4c43168e37103e454aa
+)
+
+FetchContent_MakeAvailable(raspisator)
 
 add_compile_definitions(LOG_FILEPATH="${CMAKE_CURRENT_LIST_DIR}/log")
 add_compile_definitions(RESOURCES_FILEPATH="${CMAKE_CURRENT_LIST_DIR}/resources")
