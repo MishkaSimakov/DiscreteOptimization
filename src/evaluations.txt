@@ -1,0 +1,61 @@
+sets are sorted by size in descending order
+BestGreedyNode
+full lower bound calculation
+Отрезание глубоких ветвей сильно ухудшает результат
+
+solving sc_157_0, #elements = 29, #sets = 157
+  greedy score: 102100, constructive score: 95200 (7093805 nodes)
+solving sc_330_0, #elements = 1023, #sets = 330
+  greedy score: 30, constructive score: 25 (165223 nodes)
+solving sc_1000_11, #elements = 200, #sets = 1000
+  greedy score: 170, constructive score: 149 (491971 nodes)
+solving sc_5000_1, #elements = 500, #sets = 5000
+  greedy score: 36, constructive score: 32 (49207 nodes)
+solving sc_10000_5, #elements = 1000, #sets = 10000
+  greedy score: 76, constructive score: 71 (19925 nodes)
+solving sc_10000_2, #elements = 1000, #sets = 10000
+  greedy score: 192, constructive score: 186 (15175 nodes)
+total duration: 180908ms
+
+
+
+sets are sorted by size in descending order
+BestGreedyNode
+full lower bound calculation
+Отрезание глубоких ветвей сильно ухудшает результат
+Порядок выбора множеств не фиксирован, а разный в каждой ветви: берём множество, которое жадный алгоритм выбирает первым
+
+solving sc_157_0, #elements = 29, #sets = 157
+  greedy score: 102100, constructive score: 97000 (6290107 nodes)
+solving sc_330_0, #elements = 1023, #sets = 330
+  greedy score: 30, constructive score: 26 (175139 nodes)
+solving sc_1000_11, #elements = 200, #sets = 1000
+  greedy score: 170, constructive score: 149 (433265 nodes)
+solving sc_5000_1, #elements = 500, #sets = 5000
+  greedy score: 36, constructive score: 31 (42137 nodes)
+solving sc_10000_5, #elements = 1000, #sets = 10000
+  greedy score: 76, constructive score: 68 (17999 nodes)
+solving sc_10000_2, #elements = 1000, #sets = 10000
+  greedy score: 192, constructive score: 179 (23957 nodes)
+total duration: 181749ms
+
+sets are sorted by size in descending order
+BestGreedyNode
+full lower bound calculation
+Отрезание глубоких ветвей сильно ухудшает результат
+Порядок выбора множеств не фиксирован, а разный в каждой ветви: берём множество, которое жадный алгоритм выбирает первым
++ GRASP (100 итераций, температура: 0.05, порог качества: 0.75)
+
+solving sc_157_0, #elements = 29, #sets = 157
+  greedy score: 102100, constructive score: 97000 (6290107 nodes)
+solving sc_330_0, #elements = 1023, #sets = 330
+  greedy score: 30, constructive score: 26 (175139 nodes)
+solving sc_1000_11, #elements = 200, #sets = 1000
+  greedy score: 170, constructive score: 149 (433265 nodes)
+solving sc_5000_1, #elements = 500, #sets = 5000
+  greedy score: 36, constructive score: 31 (42137 nodes)
+solving sc_10000_5, #elements = 1000, #sets = 10000
+  greedy score: 76, constructive score: 68 (17999 nodes)
+solving sc_10000_2, #elements = 1000, #sets = 10000
+  greedy score: 192, constructive score: 179 (23957 nodes)
+total duration: 181749ms

@@ -1,0 +1,8 @@
+.idea
+cmake-build-*
+**/.DS_Store
+build
+.vscode
+
+tasks/1
+src/evaluations.txt
