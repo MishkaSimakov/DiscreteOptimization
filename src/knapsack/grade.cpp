@@ -1,4 +1,4 @@
-#include <iostream>
+#include <print>
 
 #include "helpers/Files.h"
 #include "helpers/Time.h"
