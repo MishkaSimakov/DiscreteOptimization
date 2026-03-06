@@ -1,22 +1,22 @@
 #pragma once
 
 #include <unordered_set>
+#include <vector>
 
-namespace setcover {
+namespace knapsack {
 
-struct CoveringSet {
+struct Item {
+  size_t weight;
   size_t cost;
-  std::unordered_set<size_t> elements;
 };
 
 struct Problem {
-  std::vector<CoveringSet> sets;
-
-  size_t elements_count;
+  std::vector<Item> items;
+  size_t max_weight;
 };
 
 struct Solution {
-  std::vector<size_t> chosen_sets;
+  std::vector<size_t> chosen_items;
 };
 
 struct EvaluationResult {
@@ -24,4 +24,4 @@ struct EvaluationResult {
   bool is_valid;
 };
 
-}  // namespace setcover
+}  // namespace knapsack
