@@ -1,21 +1,25 @@
 #include <print>
 
 #include "helpers/Files.h"
-#include "setcover/Evaluator.h"
-#include "setcover/Reader.h"
-#include "setcover/solvers/GRASP.h"
+#include "helpers/Time.h"
+#include "knapsack/Evaluator.h"
+#include "knapsack/Reader.h"
+#include "knapsack/Types.h"
+#include "knapsack/solvers/GRASP.h"
 
 const std::vector<std::string> kGradedProblems = {
-    "sc_157_0",  "sc_330_0",   "sc_1000_11",
-    "sc_5000_1", "sc_10000_5", "sc_10000_2",
+    "ks_30_0", "ks_50_0", "ks_200_0", "ks_400_0", "ks_1000_0", "ks_10000_0",
 };
 
 void solve(const std::filesystem::path& path) {
-  auto problem = setcover::read_problem(path);
+  auto problem = knapsack::read_problem(path);
+
+  std::println("solving {}, #items = {}", path.filename().string(),
+               problem.items.size());
 
   auto grasp_solution =
-      setcover::GRASP(0.1, 0.4, std::chrono::seconds{30}).solve(problem);
-  auto grasp_evaluation = setcover::evaluate(problem, grasp_solution);
+      knapsack::GRASP(0.01, std::chrono::seconds{30}).solve(problem);
+  auto grasp_evaluation = knapsack::evaluate(problem, grasp_solution);
 
   if (!grasp_evaluation.is_valid) {
     throw std::runtime_error(
@@ -26,9 +30,13 @@ void solve(const std::filesystem::path& path) {
 }
 
 int main() {
-  for (const auto& file : kGradedProblems) {
-    solve(files::problem_path(1, file));
-  }
+  auto duration = timing::timeit([] {
+    for (const auto& file : kGradedProblems) {
+      solve(files::problem_path(2, file));
+    }
+  });
+
+  std::println("total duration: {}", duration);
 
   return 0;
 }

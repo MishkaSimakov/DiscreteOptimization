@@ -1,47 +1,28 @@
 #pragma once
 
-#include <cassert>
 #include <fstream>
-#include <sstream>
 #include <vector>
 
 #include "Types.h"
 
-namespace setcover {
+namespace knapsack {
 
 Problem read_problem(const std::filesystem::path& path) {
   std::ifstream is(path);
 
-  size_t elements_count;
-  size_t sets_count;
-  is >> elements_count >> sets_count;
+  size_t items_count;
+  size_t max_weight;
+  is >> items_count >> max_weight;
 
-  std::vector<CoveringSet> sets(sets_count);
-  std::string buffer;
-
-  // skip current line
-  std::getline(is, buffer);
-
-  for (size_t i = 0; i < sets_count; ++i) {
-    std::getline(is, buffer);
-    std::stringstream line(buffer);
-
-    line >> sets[i].cost;
-
-    assert(sets[i].cost > 0 && "cost is expected to be strictly positive");
-
-    while (!line.eof()) {
-      size_t element;
-      line >> element;
-
-      sets[i].elements.insert(element);
-    }
+  std::vector<Item> items(items_count);
+  for (size_t i = 0; i < items_count; ++i) {
+    is >> items[i].cost >> items[i].weight;
   }
 
   return Problem{
-      .sets = std::move(sets),
-      .elements_count = elements_count,
+      .items = std::move(items),
+      .max_weight = max_weight,
   };
 }
 
-}  // namespace setcover
+}  // namespace knapsack

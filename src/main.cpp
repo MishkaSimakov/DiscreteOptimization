@@ -2,60 +2,37 @@
 
 #include "helpers/Files.h"
 #include "helpers/Time.h"
-#include "setcover/Evaluator.h"
-#include "setcover/Reader.h"
-#include "setcover/solvers/Constructive.h"
-#include "setcover/solvers/GRASP.h"
-#include "setcover/solvers/Greedy.h"
-#include "setcover/solvers/MILP.h"
+#include "knapsack/Evaluator.h"
+#include "knapsack/Reader.h"
+#include "knapsack/Types.h"
+#include "knapsack/solvers/GRASP.h"
 
 const std::vector<std::string> kGradedProblems = {
-    "sc_157_0",  "sc_330_0",   "sc_1000_11",
-    "sc_5000_1", "sc_10000_5", "sc_10000_2",
+    "ks_30_0", "ks_50_0", "ks_200_0", "ks_400_0", "ks_1000_0", "ks_10000_0",
 };
 
 void solve(const std::filesystem::path& path) {
-  auto problem = setcover::read_problem(path);
+  auto problem = knapsack::read_problem(path);
 
-  // std::println("solving {}, #elements = {}, #sets = {}",
-  //              path.filename().string(), problem.elements_count,
-  //              problem.sets.size());
-  //
-  // auto greedy_solution = setcover::Greedy().solve(problem);
-  // auto greedy_evaluation = setcover::evaluate(problem, greedy_solution);
-  //
-  // assert(greedy_evaluation.is_valid);
+  std::println("solving {}, #items = {}", path.filename().string(),
+               problem.items.size());
 
   auto grasp_solution =
-      setcover::GRASP(0.1, 0.4, std::chrono::seconds{30}).solve(problem);
-  auto grasp_evaluation = setcover::evaluate(problem, grasp_solution);
+      knapsack::GRASP(0.01, std::chrono::seconds{30}).solve(problem);
+  auto grasp_evaluation = knapsack::evaluate(problem, grasp_solution);
 
-  assert(grasp_evaluation.is_valid);
+  if (!grasp_evaluation.is_valid) {
+    throw std::runtime_error(
+        "Something went terribly wrong! Solution is invalid");
+  }
 
-  // auto constructive_solver =
-  //     setcover::Constructive(problem, std::chrono::seconds{30});
-  // auto constructive_solution = constructive_solver.solve();
-  //
-  // // constructive_solver.draw_tree(std::cout);
-  //
-  // assert(constructive_solution.has_value());
-  // auto constructive_evaluation =
-  //     setcover::evaluate(problem, *constructive_solution);
-  //
-  // assert(constructive_evaluation.is_valid);
-  //
-  // std::println(
-  //     "  greedy score: {}, grasp score: {}, constructive score: {} ({} nodes)",
-  //     greedy_evaluation.score, grasp_evaluation.score,
-  //     constructive_evaluation.score,
-  //     constructive_solver.get_visited_nodes_count());
   std::println("  grasp: {}", grasp_evaluation.score);
 }
 
 int main() {
   auto duration = timing::timeit([] {
     for (const auto& file : kGradedProblems) {
-      solve(files::problem_path(1, file));
+      solve(files::problem_path(2, file));
     }
   });
 

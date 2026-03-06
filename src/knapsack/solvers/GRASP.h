@@ -1,10 +1,13 @@
 #pragma once
+#include <algorithm>
+#include <cassert>
+#include <print>
 #include <random>
 
-#include "setcover/CoveringSetsPack.h"
-#include "setcover/Types.h"
+#include "knapsack/Evaluator.h"
+#include "knapsack/Types.h"
 
-namespace setcover {
+namespace knapsack {
 
 class GRASP {
   std::default_random_engine engine_;
@@ -13,143 +16,56 @@ class GRASP {
   // Температура 0 - жадный алгоритм.
   double temperature_;
 
-  // Порог на выбор случайного множества. Пусть множество, которое выбрал бы
-  // жадный алгоритм имеет относительную стоимость l. Тогда случайное множество
-  // будет выбираться так, чтобы его относительная стоимость была хотя бы l *
-  // quality_threshold_
-  double quality_threshold_;
-
   std::chrono::milliseconds time_limit_;
 
-  static std::pair<size_t, double> argmax_set(
-      const std::vector<CoveringSet>& sets) {
-    size_t max_index = 0;
-    double max_value = 0;
-
-    for (size_t i = 0; i < sets.size(); ++i) {
-      double value = static_cast<double>(sets[i].elements.size()) /
-                     static_cast<double>(sets[i].cost);
-
-      if (max_value < value) {
-        max_value = value;
-        max_index = i;
-      }
-    }
-
-    return {max_index, max_value};
-  }
-
-  static std::vector<size_t> get_suitable_sets(
-      const std::vector<CoveringSet>& sets, double threshold) {
-    std::vector<size_t> result;
-
-    for (size_t i = 0; i < sets.size(); ++i) {
-      double value = static_cast<double>(sets[i].elements.size()) /
-                     static_cast<double>(sets[i].cost);
-
-      if (value >= threshold) {
-        result.push_back(i);
-      }
-    }
-
-    return result;
-  }
-
-  // Solution iteration(const Problem& problem) {
-  //   size_t sets_count = problem.sets.size();
-  //
-  //   std::uniform_real_distribution<double> coin(0, 1);
-  //
-  //   std::vector<size_t> result;
-  //
-  //   // копируем все множества, так как далее из них будут убираться уже
-  //   покрытые
-  //   // элементы
-  //   auto sets = problem.sets;
-  //
-  //   while (true) {
-  //     auto [greedy_set, greedy_cost] = argmax_set(sets);
-  //
-  //     size_t chosen_set = greedy_set;
-  //     if (coin(engine_) < temperature_) {
-  //       auto suitable_sets =
-  //           get_suitable_sets(sets, greedy_cost * quality_threshold_);
-  //
-  //       std::uniform_int_distribution<size_t> dist(0, suitable_sets.size() -
-  //       1); chosen_set = suitable_sets[dist(engine_)];
-  //     }
-  //
-  //     if (sets[chosen_set].elements.empty()) {
-  //       break;
-  //     }
-  //
-  //     result.push_back(chosen_set);
-  //
-  //     for (size_t i = 0; i < sets_count; ++i) {
-  //       if (i == chosen_set) {
-  //         continue;
-  //       }
-  //
-  //       for (size_t element : sets[chosen_set].elements) {
-  //         sets[i].elements.erase(element);
-  //       }
-  //     }
-  //     sets[chosen_set].elements.clear();
-  //   }
-  //
-  //   return Solution{std::move(result)};
-  // }
-  std::optional<std::pair<Solution, size_t>> iteration(const Problem& problem,
-                                                       CoveringSetsPack& pack,
-                                                       size_t best_score) {
+  Solution iteration(
+      const Problem& problem,
+      const std::vector<std::pair<double, size_t>>& relative_costs) {
     std::uniform_real_distribution<double> coin(0, 1);
     std::vector<size_t> result;
 
-    size_t current_score = 0;
+    size_t current_weight = 0;
+    size_t current_cost = 0;
 
-    pack.reset();
-
-    while (true) {
-      auto greedy_set = pack.max_cost_set();
-
-      if (!greedy_set) {
-        break;
-      }
-
-      size_t chosen_set = greedy_set->first;
+    for (auto [_, id] : relative_costs) {
       if (coin(engine_) < temperature_) {
-        auto suitable_sets =
-            pack.get_covering_sets(greedy_set->second * quality_threshold_);
-
-        std::uniform_int_distribution<size_t> dist(0, suitable_sets.size() - 1);
-        chosen_set = suitable_sets[dist(engine_)];
+        continue;
       }
 
-      current_score += problem.sets[chosen_set].cost;
-      result.push_back(chosen_set);
-      pack.cover_set(chosen_set);
-
-      if (current_score > best_score) {
-        return std::nullopt;
+      if (current_weight + problem.items[id].weight > problem.max_weight) {
+        continue;
       }
+
+      current_weight += problem.items[id].weight;
+      current_cost += problem.items[id].cost;
+
+      result.push_back(id);
     }
 
-    return std::pair{Solution{std::move(result)}, current_score};
+    return Solution{std::move(result)};
   }
 
  public:
-  explicit GRASP(double temperature, double quality_threshold,
-                 std::chrono::milliseconds time_limit)
-      : temperature_(temperature),
-        quality_threshold_(quality_threshold),
-        time_limit_(time_limit) {}
+  explicit GRASP(double temperature, std::chrono::milliseconds time_limit)
+      : temperature_(temperature), time_limit_(time_limit) {}
 
   Solution solve(const Problem& problem) {
     auto start_time = std::chrono::high_resolution_clock::now();
 
-    CoveringSetsPack pack(problem);
+    std::vector<std::pair<double, size_t>> relative_costs(problem.items.size());
+    for (size_t i = 0; i < problem.items.size(); ++i) {
+      auto item = problem.items[i];
+
+      relative_costs.emplace_back(
+          static_cast<double>(item.cost) / static_cast<double>(item.weight), i);
+    }
+
+    std::ranges::sort(relative_costs, {}, [](std::pair<double, size_t> item) {
+      return -item.first;
+    });
+
     Solution best_solution;
-    size_t best_score = 1e10;  // infinity
+    size_t best_score = 0;
 
     size_t iterations_cnt = 0;
 
@@ -163,22 +79,19 @@ class GRASP {
         break;
       }
 
-      auto result = iteration(problem, pack, best_score);
+      auto solution = iteration(problem, relative_costs);
 
-      if (!result) {
-        continue;
-      }
+      auto evaluation = evaluate(problem, solution);
+      assert(evaluation.is_valid);
 
-      if (result->second < best_score) {
-        best_score = result->second;
-        best_solution = std::move(result->first);
+      if (evaluation.score > best_score) {
+        best_score = evaluation.score;
+        best_solution = std::move(solution);
       }
     }
-
-    std::println("grasp iterations: {}", iterations_cnt);
 
     return best_solution;
   }
 };
 
-}  // namespace setcover
+}  // namespace knapsack

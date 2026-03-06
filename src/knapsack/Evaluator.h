@@ -2,38 +2,21 @@
 
 #include "Types.h"
 
-namespace setcover {
+namespace knapsack {
 
 EvaluationResult evaluate(const Problem& problem, const Solution& solution) {
-  // check that all elements are covered
-  for (size_t i = 0; i < problem.elements_count; ++i) {
-    bool is_covered = false;
+  size_t total_cost = 0;
+  size_t total_weight = 0;
 
-    for (size_t set_index : solution.chosen_sets) {
-      if (problem.sets[set_index].elements.contains(i)) {
-        is_covered = true;
-        break;
-      }
-    }
-
-    if (!is_covered) {
-      return EvaluationResult{
-          .score = 0,
-          .is_valid = false,
-      };
-    }
-  }
-
-  // calculate score
-  size_t score = 0;
-  for (size_t set_index : solution.chosen_sets) {
-    score += problem.sets[set_index].cost;
+  for (size_t item : solution.chosen_items) {
+    total_cost += problem.items[item].cost;
+    total_weight += problem.items[item].weight;
   }
 
   return EvaluationResult{
-      .score = score,
-      .is_valid = true,
+      .score = total_cost,
+      .is_valid = total_weight <= problem.max_weight,
   };
 }
 
-}  // namespace setcover
+}  // namespace knapsack
