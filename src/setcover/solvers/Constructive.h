@@ -190,8 +190,104 @@ class Constructive {
     return {Solution{std::move(result)}, first_greedy};
   }
 
-  double get_lower_bound(std::span<const std::pair<size_t, bool>> decisions) {
-    return 0;
+  auto to_milp(const Problem& problem) {
+    size_t n = problem.elements_count;
+    size_t d = problem.sets.size();
+
+    Matrix<double> A(n, d + n, 0);
+    Matrix<double> b(n, 1, 0);
+    Matrix<double> c(1, d + n, 0);
+
+    for (size_t j = 0; j < n; ++j) {
+      for (size_t i = 0; i < d; ++i) {
+        if (problem.sets[i].elements.contains(j)) {
+          A[j, i] = 1;
+        }
+      }
+
+      A[j, d + j] = -1;
+    }
+
+    for (size_t i = 0; i < n; ++i) {
+      b[i, 0] = 1;
+    }
+
+    for (size_t i = 0; i < d; ++i) {
+      c[0, i] = -static_cast<double>(problem.sets[i].cost);
+    }
+
+    Bounds<double> bounds(d + n);
+    for (size_t i = 0; i < d; ++i) {
+      bounds[i] = {0, 1};
+    }
+
+    for (size_t i = d; i < d + n; ++i) {
+      bounds[i] = {0, std::nullopt};
+    }
+
+    return std::make_tuple(A, b, c, bounds);
+  }
+
+  double get_lower_bound(std::span<const std::pair<size_t, bool>> decisions,
+                         const Solution& feasible_solution) {
+    // double current_cost = 0;
+    //
+    // for (auto [set, is_chosen] : decisions) {
+    //   if (is_chosen) {
+    //     current_cost += static_cast<double>(problem_.sets[set].cost);
+    //   }
+    // }
+
+    auto [A, b, c, bounds] = to_milp(problem_);
+
+    auto [n, d] = A.shape();
+
+    // slightly perturb bounds
+    // std::default_random_engine engine;
+    // std::uniform_int_distribution distr(0, 5);
+    // for (size_t i = 0; i < d; ++i) {
+    //   if (bounds[i].lower) {
+    //     *bounds[i].lower -= static_cast<double>(distr(engine)) * 1e-6;
+    //   }
+    //
+    //   if (bounds[i].upper) {
+    //     *bounds[i].upper += static_cast<double>(distr(engine)) * 1e-6;
+    //   }
+    // }
+
+    simplex::Settings<double> settings{.is_strict = true};
+    auto simplex = simplex::Simplex<double, simplex::LoggingAccountant<double>>(
+        CSCMatrix(A), b, c, settings);
+
+    // construct feasible point
+    std::vector states(d, VariableState::AT_LOWER);
+    for (size_t set : feasible_solution.chosen_sets) {
+      states[set] = VariableState::AT_UPPER;
+    }
+    for (size_t i = 0; i < n; ++i) {
+      states[d - i - 1] = VariableState::BASIC;
+    }
+
+    for (auto [set, is_chosen] : decisions) {
+      if (is_chosen) {
+        bounds[set] = {1, 1};
+      } else {
+        bounds[set] = {0, 0};
+      }
+    }
+
+    auto result = simplex.primal(bounds, states);
+
+    if (!std::holds_alternative<FiniteLPSolution<double>>(result.solution)) {
+      throw std::runtime_error("Failed");
+    }
+
+    double lower_bound =
+        -std::get<FiniteLPSolution<double>>(result.solution).value;
+
+    std::println("  lb: {}", lower_bound);
+
+    return lower_bound;
   }
 
   void add_drawer_node(size_t id, std::string label, std::string fill,
@@ -236,7 +332,7 @@ class Constructive {
       incumbent_ = {solution, evaluation.score};
     }
 
-    double lower_bound = get_lower_bound(decisions);
+    double lower_bound = get_lower_bound(decisions, solution);
 
     Node node = {
         .id = nodes_visited_,

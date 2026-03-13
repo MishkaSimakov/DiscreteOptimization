@@ -4,13 +4,14 @@
 #include "setcover/Evaluator.h"
 #include "setcover/Reader.h"
 #include "setcover/solvers/GRASP.h"
+#include "solvers/Constructive.h"
 
 const std::vector<std::string> kGradedProblems = {
     "sc_157_0",  "sc_330_0",   "sc_1000_11",
     "sc_5000_1", "sc_10000_5", "sc_10000_2",
 };
 
-void solve(const std::filesystem::path& path) {
+void solve_grasp(const std::filesystem::path& path) {
   auto problem = setcover::read_problem(path);
 
   std::println("solving {}, #elements = {}, #sets = {}",
@@ -29,9 +30,34 @@ void solve(const std::filesystem::path& path) {
   std::println("  grasp: {}", grasp_evaluation.score);
 }
 
+void solve_constructive(const std::filesystem::path& path) {
+  auto problem = setcover::read_problem(path);
+
+  std::println("solving {}, #elements = {}, #sets = {}",
+               path.filename().string(), problem.elements_count,
+               problem.sets.size());
+
+  auto solution =
+      setcover::Constructive(problem, std::chrono::seconds{30}).solve();
+
+  if (!solution) {
+    throw std::runtime_error(
+        "Something went terribly wrong! Failed to find solution.");
+  }
+
+  auto evaluation = setcover::evaluate(problem, *solution);
+
+  if (!evaluation.is_valid) {
+    throw std::runtime_error(
+        "Something went terribly wrong! Solution is invalid");
+  }
+
+  std::println("  constructive: {}", evaluation.score);
+}
+
 int main() {
   for (const auto& file : kGradedProblems) {
-    solve(files::problem_path(1, file));
+    solve_constructive(files::problem_path(1, file));
   }
 
   return 0;
