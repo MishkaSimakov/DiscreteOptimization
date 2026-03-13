@@ -53,8 +53,8 @@ void solve(const std::filesystem::path& path) {
   std::println("  greedy={}, dsatur={}, avarice={}", greedy_evaluation.score,
                dsatur_evaluation.score, avarice_evaluation.score);
 
-  coloring::Output().store(files::output_path("coloring", problem_name),
-                           avarice_solution);
+  // coloring::Output().store(files::output_path("coloring", problem_name),
+ //                          avarice_solution);
 }
 
 int main() {

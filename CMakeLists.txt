@@ -7,7 +7,7 @@ include(FetchContent)
 FetchContent_Declare(
         raspisator
         GIT_REPOSITORY https://github.com/MishkaSimakov/raspisator.git
-        GIT_TAG 2f0f74adc1886796e630c4c43168e37103e454aa
+        GIT_TAG 48f57ab2204d08cd6b7e2b78d8f5172227c2e457
 )
 
 FetchContent_MakeAvailable(raspisator)
@@ -22,7 +22,7 @@ function(add_target target_name source_path)
 
     target_compile_definitions(
             ${target_name}
-            PUBLIC PATH_TO_TASKS="${CMAKE_CURRENT_LIST_DIR}/tasks"
+            PUBLIC PATH_TO_TASKS="${CMAKE_CURRENT_LIST_DIR}/tasks" PATH_TO_OUTPUT="${CMAKE_CURRENT_LIST_DIR}/output"
     )
 endfunction()
 
@@ -34,3 +34,4 @@ add_target(main src/main.cpp)
 
 add_task_target(setcover)
 add_task_target(knapsack)
+add_task_target(coloring)
