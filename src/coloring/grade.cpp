@@ -27,31 +27,31 @@ void solve(const std::filesystem::path& path) {
   std::println("solving {}, #nodes = {}", problem_name,
                problem.adjacent.size());
 
-  auto greedy_solution = coloring::Greedy().solve(problem);
-  auto greedy_evaluation = coloring::evaluate(problem, greedy_solution);
+  coloring::Solution solution;
 
-  if (!greedy_evaluation.is_valid) {
+  auto duration = timing::timeit([&]() {
+    auto dsatur_solution = coloring::DSatur().solve(problem);
+
+    if (!coloring::evaluate(problem, dsatur_solution).is_valid) {
+      throw std::runtime_error("Invalid solution!");
+    }
+
+    auto avarice =
+        coloring::Avarice(dsatur_solution, timing::Deadline::after(5s));
+    solution = avarice.solve(problem);
+  });
+
+  auto evaluation = coloring::evaluate(problem, solution);
+  if (!evaluation.is_valid) {
     throw std::runtime_error("Invalid solution!");
   }
 
-  auto dsatur_solution = coloring::DSatur().solve(problem);
-  auto dsatur_evaluation = coloring::evaluate(problem, dsatur_solution);
+  coloring::Statistics stats{
+      .result = evaluation.score,
+      .duration = duration,
+  };
 
-  if (!dsatur_evaluation.is_valid) {
-    throw std::runtime_error("Invalid solution!");
-  }
-
-  auto avarice =
-      coloring::Avarice(dsatur_solution, timing::Deadline::after(5s));
-  auto avarice_solution = avarice.solve(problem);
-  auto avarice_evaluation = coloring::evaluate(problem, avarice_solution);
-
-  if (!avarice_evaluation.is_valid) {
-    throw std::runtime_error("Invalid solution!");
-  }
-
-  coloring::Output().store(files::output_path("coloring", problem_name),
-                           avarice_solution);
+  coloring::Output().store(problem_name, solution, stats);
 }
 
 int main() {

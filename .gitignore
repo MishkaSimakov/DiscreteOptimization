@@ -4,6 +4,8 @@ cmake-build-*
 build
 .vscode
 
+output
+
 # ignore all tasks except those that are graded
 tasks/1/*
 tasks/2/*

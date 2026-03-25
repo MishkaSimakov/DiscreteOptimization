@@ -14,7 +14,7 @@ jobs:
 
     steps:
       - name: Install jq
-        run: sudo apt-get install -y jq
+        run: sudo apt-get update && sudo apt-get install -y jq
 
       # standard compiler in ubuntu-latest is gcc
       # it doesn't support <print>
@@ -46,3 +46,46 @@ jobs:
         with:
           name: result-${{ matrix.task }}
           path: output/${{ matrix.task }}
+
+  aggregate:
+    runs-on: ubuntu-latest
+    needs: run-task
+
+    steps:
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Generate summary table
+        run: |
+          echo "## Task Results" >> $GITHUB_STEP_SUMMARY
+
+          for task_dir in artifacts/result-*; do
+            task=$(basename "$task_dir" | sed 's/result-//')
+
+            echo "### $task" >> $GITHUB_STEP_SUMMARY
+            echo "| Instance | Result | Duration (ms) |" >> $GITHUB_STEP_SUMMARY
+            echo "|----------|--------|---------------|" >> $GITHUB_STEP_SUMMARY
+
+            files=$(ls "$task_dir"/*_stats.json 2>/dev/null | sort -V || true)
+
+            if [ -z "$files" ]; then
+              echo "| (no data) | - | - |" >> $GITHUB_STEP_SUMMARY
+              continue
+            fi
+
+            for file in $files; do
+              base=$(basename "$file" _stats.json)
+
+              result=$(jq '.result' "$file")
+              duration=$(jq '.duration' "$file")
+
+              echo "| $base | $result | $duration |" >> $GITHUB_STEP_SUMMARY
+            done
+
+            echo "" >> $GITHUB_STEP_SUMMARY
+          done
