@@ -7,7 +7,7 @@ include(FetchContent)
 FetchContent_Declare(
         raspisator
         GIT_REPOSITORY https://github.com/MishkaSimakov/raspisator.git
-        GIT_TAG 48f57ab2204d08cd6b7e2b78d8f5172227c2e457
+        GIT_TAG 25f21abf0d0f8b3cbf35e36cf8646996663b5448
 )
 
 FetchContent_MakeAvailable(raspisator)
