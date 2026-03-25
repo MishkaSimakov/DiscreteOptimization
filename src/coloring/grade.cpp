@@ -20,9 +20,9 @@ const std::vector<std::string> kGradedProblems = {
 
 using namespace std::chrono_literals;
 
-void solve(const std::filesystem::path& path) {
+void solve(const std::string& problem_name) {
+  auto path = files::problem_path(3, problem_name);
   auto problem = coloring::read_problem(path);
-  auto problem_name = path.filename().string();
 
   std::println("solving {}, #nodes = {}", problem_name,
                problem.adjacent.size());
@@ -37,7 +37,7 @@ void solve(const std::filesystem::path& path) {
     }
 
     auto avarice =
-        coloring::Avarice(dsatur_solution, timing::Deadline::after(5s));
+        coloring::Avarice(dsatur_solution, timing::Deadline::after(60s));
     solution = avarice.solve(problem);
   });
 
@@ -46,18 +46,15 @@ void solve(const std::filesystem::path& path) {
     throw std::runtime_error("Invalid solution!");
   }
 
-  coloring::Statistics stats{
-      .result = evaluation.score,
-      .duration = duration,
-  };
+  coloring::Statistics stats(evaluation, duration);
 
   coloring::Output().store(problem_name, solution, stats);
 }
 
 int main() {
   auto duration = timing::timeit([] {
-    for (const auto& file : kGradedProblems) {
-      solve(files::problem_path(3, file));
+    for (const auto& problem_name : kGradedProblems) {
+      solve(problem_name);
     }
   });
 

@@ -19,9 +19,11 @@ struct EvaluationResult {
   bool is_valid;
 };
 
-struct Statistics {
-  size_t result;
+struct Statistics : EvaluationResult {
   std::chrono::milliseconds duration;
+
+  Statistics(EvaluationResult evaluation, std::chrono::milliseconds duration)
+      : EvaluationResult(evaluation), duration(duration) {}
 };
 
 }  // namespace coloring

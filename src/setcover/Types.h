@@ -25,4 +25,11 @@ struct EvaluationResult {
   bool is_valid;
 };
 
+struct Statistics : EvaluationResult {
+  std::chrono::milliseconds duration;
+
+  Statistics(EvaluationResult evaluation, std::chrono::milliseconds duration)
+      : EvaluationResult(evaluation), duration(duration) {}
+};
+
 }  // namespace setcover

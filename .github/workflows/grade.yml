@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        task: [ coloring ]
+        task: [ setcover knapsack coloring ]
 
     steps:
       - name: Install jq
@@ -26,6 +26,8 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
 
       - name: Configure
         run: |
