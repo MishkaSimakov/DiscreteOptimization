@@ -42,7 +42,7 @@ void solve(const std::filesystem::path& path) {
   }
 
   auto avarice =
-      coloring::Avarice(dsatur_solution, timing::Deadline::after(60s));
+      coloring::Avarice(dsatur_solution, timing::Deadline::after(5s));
   auto avarice_solution = avarice.solve(problem);
   auto avarice_evaluation = coloring::evaluate(problem, avarice_solution);
 
@@ -50,11 +50,8 @@ void solve(const std::filesystem::path& path) {
     throw std::runtime_error("Invalid solution!");
   }
 
-  std::println("  greedy={}, dsatur={}, avarice={}", greedy_evaluation.score,
-               dsatur_evaluation.score, avarice_evaluation.score);
-
-  // coloring::Output().store(files::output_path("coloring", problem_name),
- //                          avarice_solution);
+  coloring::Output().store(files::output_path("coloring", problem_name),
+                           avarice_solution);
 }
 
 int main() {

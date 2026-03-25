@@ -1,4 +1,7 @@
+#pragma once
+
 #include <filesystem>
+#include <fstream>
 
 namespace files {
 
@@ -17,6 +20,13 @@ inline std::filesystem::directory_iterator problems_iterator(
     size_t task_index) {
   return std::filesystem::directory_iterator{
       std::filesystem::path(PATH_TO_TASKS) / std::to_string(task_index)};
+}
+
+inline std::ofstream open_creating_directories(
+    const std::filesystem::path& path) {
+  std::filesystem::create_directories(path.parent_path());
+
+  return std::ofstream(path);
 }
 
 }  // namespace files

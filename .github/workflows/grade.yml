@@ -1,0 +1,37 @@
+name: Run Tasks
+
+on:
+  push:
+
+jobs:
+  run-task:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        task: [coloring]
+
+    steps:
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -B build -S .
+
+      - name: Build
+        run: cmake --build build -j
+
+      - name: Run task
+        run: |
+          echo "Running ${{ matrix.task }}"
+          cmake --build build --target ${{ matrix.task }}
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: result-${{ matrix.task }}
+          path: outputs/${{ matrix.task }}
