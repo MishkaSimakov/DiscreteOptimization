@@ -4,6 +4,31 @@ cmake-build-*
 build
 .vscode
 
-tasks/1
-tasks/2
-tasks/3
+# ignore all tasks except those that are graded
+tasks/1/*
+tasks/2/*
+tasks/3/*
+
+# setcover
+!tasks/1/sc_157_0
+!tasks/1/sc_330_0
+!tasks/1/sc_1000_11
+!tasks/1/sc_5000_1
+!tasks/1/sc_10000_5
+!tasks/1/sc_10000_2
+
+# knapsack
+!tasks/2/ks_30_0
+!tasks/2/ks_50_0
+!tasks/2/ks_200_0
+!tasks/2/ks_400_0
+!tasks/2/ks_1000_0
+!tasks/2/ks_10000_0
+
+# coloring
+!tasks/3/gc_50_3
+!tasks/3/gc_70_7
+!tasks/3/gc_100_5
+!tasks/3/gc_250_9
+!tasks/3/gc_500_1
+!tasks/3/gc_1000_5
