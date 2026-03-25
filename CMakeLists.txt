@@ -4,13 +4,19 @@ project(DiscreteOptimization)
 set(CMAKE_CXX_STANDARD 23)
 
 include(FetchContent)
+
+# install raspisator
 FetchContent_Declare(
         raspisator
         GIT_REPOSITORY https://github.com/MishkaSimakov/raspisator.git
-        GIT_TAG 48f57ab2204d08cd6b7e2b78d8f5172227c2e457
+        GIT_TAG c13a62b58c30f302424e4aed54735eb42cfebeb7
 )
 
 FetchContent_MakeAvailable(raspisator)
+
+# install json
+FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz)
+FetchContent_MakeAvailable(json)
 
 add_compile_definitions(LOG_FILEPATH="${CMAKE_CURRENT_LIST_DIR}/log")
 add_compile_definitions(RESOURCES_FILEPATH="${CMAKE_CURRENT_LIST_DIR}/resources")
@@ -18,7 +24,7 @@ add_compile_definitions(RESOURCES_FILEPATH="${CMAKE_CURRENT_LIST_DIR}/resources"
 function(add_target target_name source_path)
     add_executable(${target_name} ${source_path})
     target_include_directories(${target_name} PUBLIC src)
-    target_link_libraries(${target_name} raspisator)
+    target_link_libraries(${target_name} raspisator nlohmann_json::nlohmann_json)
 
     target_compile_definitions(
             ${target_name}

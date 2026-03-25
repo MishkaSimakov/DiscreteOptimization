@@ -1,6 +1,5 @@
 #pragma once
 
-#include <unordered_set>
 #include <vector>
 
 namespace knapsack {
@@ -22,6 +21,13 @@ struct Solution {
 struct EvaluationResult {
   size_t score;
   bool is_valid;
+};
+
+struct Statistics : EvaluationResult {
+  std::chrono::milliseconds duration;
+
+  Statistics(EvaluationResult evaluation, std::chrono::milliseconds duration)
+      : EvaluationResult(evaluation), duration(duration) {}
 };
 
 }  // namespace knapsack

@@ -20,47 +20,41 @@ const std::vector<std::string> kGradedProblems = {
 
 using namespace std::chrono_literals;
 
-void solve(const std::filesystem::path& path) {
+void solve(const std::string& problem_name) {
+  auto path = files::problem_path(3, problem_name);
   auto problem = coloring::read_problem(path);
-  auto problem_name = path.filename().string();
 
   std::println("solving {}, #nodes = {}", problem_name,
                problem.adjacent.size());
 
-  auto greedy_solution = coloring::Greedy().solve(problem);
-  auto greedy_evaluation = coloring::evaluate(problem, greedy_solution);
+  coloring::Solution solution;
 
-  if (!greedy_evaluation.is_valid) {
+  auto duration = timing::timeit([&]() {
+    auto dsatur_solution = coloring::DSatur().solve(problem);
+
+    if (!coloring::evaluate(problem, dsatur_solution).is_valid) {
+      throw std::runtime_error("Invalid solution!");
+    }
+
+    auto avarice =
+        coloring::Avarice(dsatur_solution, timing::Deadline::after(60s));
+    solution = avarice.solve(problem);
+  });
+
+  auto evaluation = coloring::evaluate(problem, solution);
+  if (!evaluation.is_valid) {
     throw std::runtime_error("Invalid solution!");
   }
 
-  auto dsatur_solution = coloring::DSatur().solve(problem);
-  auto dsatur_evaluation = coloring::evaluate(problem, dsatur_solution);
+  coloring::Statistics stats(evaluation, duration);
 
-  if (!dsatur_evaluation.is_valid) {
-    throw std::runtime_error("Invalid solution!");
-  }
-
-  auto avarice =
-      coloring::Avarice(dsatur_solution, timing::Deadline::after(60s));
-  auto avarice_solution = avarice.solve(problem);
-  auto avarice_evaluation = coloring::evaluate(problem, avarice_solution);
-
-  if (!avarice_evaluation.is_valid) {
-    throw std::runtime_error("Invalid solution!");
-  }
-
-  std::println("  greedy={}, dsatur={}, avarice={}", greedy_evaluation.score,
-               dsatur_evaluation.score, avarice_evaluation.score);
-
-  // coloring::Output().store(files::output_path("coloring", problem_name),
- //                          avarice_solution);
+  coloring::Output().store(problem_name, solution, stats);
 }
 
 int main() {
   auto duration = timing::timeit([] {
-    for (const auto& file : kGradedProblems) {
-      solve(files::problem_path(3, file));
+    for (const auto& problem_name : kGradedProblems) {
+      solve(problem_name);
     }
   });
 

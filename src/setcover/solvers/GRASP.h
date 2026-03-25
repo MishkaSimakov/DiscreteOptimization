@@ -1,4 +1,6 @@
 #pragma once
+
+#include <optional>
 #include <random>
 
 #include "setcover/CoveringSetsPack.h"
