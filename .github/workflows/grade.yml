@@ -25,7 +25,7 @@ jobs:
           platform: x64
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.ref }}
 
@@ -44,7 +44,7 @@ jobs:
           ./build/${{ matrix.task }}
 
       - name: Upload results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: result-${{ matrix.task }}
           path: output/${{ matrix.task }}
@@ -58,7 +58,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y jq
 
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
 
@@ -70,7 +70,7 @@ jobs:
             task=$(basename "$task_dir" | sed 's/result-//')
 
             echo "### $task" >> $GITHUB_STEP_SUMMARY
-            echo "| Instance | Result | Duration (ms) |" >> $GITHUB_STEP_SUMMARY
+            echo "| Instance | Score | Duration (ms) |" >> $GITHUB_STEP_SUMMARY
             echo "|----------|--------|---------------|" >> $GITHUB_STEP_SUMMARY
 
             files=$(ls "$task_dir"/*_stats.json 2>/dev/null | sort -V || true)
@@ -83,10 +83,10 @@ jobs:
             for file in $files; do
               base=$(basename "$file" _stats.json)
 
-              result=$(jq '.result' "$file")
+              score=$(jq '.score' "$file")
               duration=$(jq '.duration' "$file")
 
-              echo "| $base | $result | $duration |" >> $GITHUB_STEP_SUMMARY
+              echo "| $base | $score | $duration |" >> $GITHUB_STEP_SUMMARY
             done
 
             echo "" >> $GITHUB_STEP_SUMMARY
