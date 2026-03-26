@@ -23,6 +23,8 @@ class GRASP {
   // quality_threshold_
   const double quality_threshold;
 
+  const SimulatedAnnealingConfig simulated_annealing_config;
+
   const timing::Deadline deadline;
 
   static std::pair<size_t, double> argmax_set(
@@ -95,9 +97,10 @@ class GRASP {
 
  public:
   explicit GRASP(double temperature, double quality_threshold,
-                 timing::Deadline deadline)
+                 timing::Deadline deadline, SimulatedAnnealingConfig config)
       : temperature(temperature),
         quality_threshold(quality_threshold),
+        simulated_annealing_config(config),
         deadline(deadline) {}
 
   Solution solve(const Problem& problem) {
@@ -106,8 +109,6 @@ class GRASP {
     size_t best_score = 1e10;  // infinity
 
     size_t iterations_cnt = 0;
-
-    SimulatedAnnealing annealing(deadline);
 
     while (true) {
       ++iterations_cnt;
@@ -119,7 +120,8 @@ class GRASP {
       auto result = iteration(problem, pack, best_score);
 
       // improve solution using Simulated Annealing
-      auto improved = annealing.solve(problem, result.first);
+      auto improved = SimulatedAnnealing(deadline, simulated_annealing_config)
+                          .solve(problem, result.first);
       size_t cost = get_score(problem, improved);
 
       if (cost < best_score) {
@@ -128,7 +130,7 @@ class GRASP {
       }
     }
 
-    std::println("grasp iterations: {}", iterations_cnt);
+    // std::println("grasp iterations: {}", iterations_cnt);
 
     return best_solution;
   }

@@ -5,6 +5,7 @@
 
 #include "helpers/Time.h"
 #include "setcover/CoveringSetsPack.h"
+#include "setcover/Evaluator.h"
 #include "setcover/Types.h"
 
 namespace setcover {

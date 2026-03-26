@@ -24,3 +24,5 @@ add_grade_target(coloring)
 add_experiments_target(setcover)
 add_experiments_target(knapsack)
 add_experiments_target(coloring)
+
+add_target(setcover_gridsearch setcover/grid_search.cpp)

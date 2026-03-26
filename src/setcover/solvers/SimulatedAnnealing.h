@@ -12,8 +12,21 @@
 
 namespace setcover {
 
+struct SimulatedAnnealingConfig {
+  double relative_start_temperature = 1e-2;
+  double relative_end_temperature = 1e-9;
+  double alpha = 0.99;  // temperature change rate
+  size_t removed_sets_count = 4;
+  size_t iterations_per_temperature = 5;
+  size_t iterations_per_move = 10;
+
+  double taboo_duration_multiplier = 1;
+};
+
 class SimulatedAnnealing {
   const timing::Deadline deadline;
+
+  const SimulatedAnnealingConfig config;
 
   // random
   size_t random_counter_{0};
@@ -84,20 +97,18 @@ class SimulatedAnnealing {
   }
 
  public:
-  explicit SimulatedAnnealing(timing::Deadline deadline) : deadline(deadline) {}
+  explicit SimulatedAnnealing(timing::Deadline deadline,
+                              SimulatedAnnealingConfig config)
+      : deadline(deadline), config(config) {}
 
   Solution solve(const Problem& problem, const Solution& initial_solution) {
     std::uniform_real_distribution<double> random_accept(0, 1);
 
-    constexpr double relative_start_temperature = 1e-2;
-    constexpr double relative_end_temperature = 1e-9;
-    constexpr double alpha = 0.99;  // temperature change rate
-    constexpr size_t start_removed_sets_count = 4;
-    constexpr size_t iterations_per_temperature = 5;
     // square root of neighborhood size
     const size_t taboo_duration =
+        config.taboo_duration_multiplier *
         std::pow(static_cast<double>(initial_solution.chosen_sets.size()),
-                 static_cast<double>(start_removed_sets_count) / 2);
+                 static_cast<double>(config.removed_sets_count) / 2);
 
     // (move hash, last iteration when it was used)
     std::unordered_map<size_t, size_t> taboo_list;
@@ -109,18 +120,18 @@ class SimulatedAnnealing {
     Solution best_solution = current_solution;
     size_t best_cost = current_cost;
 
-    size_t removed_sets_count = start_removed_sets_count;
-
-    double temperature = relative_start_temperature * current_cost;
-    const double end_temperature = relative_end_temperature * current_cost;
+    double temperature =
+        config.relative_start_temperature * static_cast<double>(current_cost);
+    const double end_temperature =
+        config.relative_end_temperature * static_cast<double>(current_cost);
     size_t iteration = 0;
 
-    std::print("  {} -> ", current_cost);
+    // std::print("  {} -> ", current_cost);
 
     while (temperature > end_temperature) {
       // remove random sets from the solution
-      auto removed =
-          remove_random_sets(problem, current_solution, removed_sets_count);
+      auto removed = remove_random_sets(problem, current_solution,
+                                        config.removed_sets_count);
 
       size_t hash = unordered_vector_hash(removed);
       auto [itr, inserted] = taboo_list.emplace(hash, iteration);
@@ -132,7 +143,7 @@ class SimulatedAnnealing {
         Solution best_finished;
         size_t best_finished_cost = 1e10;  // infinity
 
-        for (size_t i = 0; i < 10; ++i) {
+        for (size_t i = 0; i < config.iterations_per_move; ++i) {
           finish_solution(problem, current_solution, pack);
 
           size_t cost = get_score(problem, current_solution);
@@ -161,8 +172,8 @@ class SimulatedAnnealing {
             best_cost = current_cost;
             best_solution = current_solution;
 
-            std::print("{} -> ", new_cost);
-            std::cout << std::flush;
+            // std::print("{} -> ", new_cost);
+            // std::cout << std::flush;
           }
         } else {
           // rollback changes
@@ -179,8 +190,8 @@ class SimulatedAnnealing {
         }
       }
 
-      if ((iteration + 1) % iterations_per_temperature == 0) {
-        temperature *= alpha;
+      if ((iteration + 1) % config.iterations_per_temperature == 0) {
+        temperature *= config.alpha;
       }
       ++iteration;
 
@@ -189,7 +200,7 @@ class SimulatedAnnealing {
       }
     }
 
-    std::println("done");
+    // std::println("done");
 
     return best_solution;
   }
