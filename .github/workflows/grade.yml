@@ -24,8 +24,32 @@ jobs:
           - task: setcover
             instance: sc_10000_2
 
+          - task: knapsack
+            instance: ks_30_0
+          - task: knapsack
+            instance: ks_50_0
+          - task: knapsack
+            instance: ks_200_0
+          - task: knapsack
+            instance: ks_400_0
+          - task: knapsack
+            instance: ks_1000_0
+          - task: knapsack
+            instance: ks_10000_0
+
           - task: coloring
-            instance: [ gc_50_3, gc_70_7, gc_100_5, gc_250_9, gc_500_1, gc_1000_5 ]
+            instance: gc_50_3
+          - task: coloring
+            instance: gc_70_7
+          - task: coloring
+            instance: gc_100_5
+          - task: coloring
+            instance: gc_250_9
+          - task: coloring
+            instance: gc_500_1
+          - task: coloring
+            instance: gc_1000_5
+
     steps:
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
