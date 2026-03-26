@@ -57,50 +57,6 @@ class GRASP {
     return result;
   }
 
-  // Solution iteration(const Problem& problem) {
-  //   size_t sets_count = problem.sets.size();
-  //
-  //   std::uniform_real_distribution<double> coin(0, 1);
-  //
-  //   std::vector<size_t> result;
-  //
-  //   // копируем все множества, так как далее из них будут убираться уже
-  //   покрытые
-  //   // элементы
-  //   auto sets = problem.sets;
-  //
-  //   while (true) {
-  //     auto [greedy_set, greedy_cost] = argmax_set(sets);
-  //
-  //     size_t chosen_set = greedy_set;
-  //     if (coin(engine_) < temperature_) {
-  //       auto suitable_sets =
-  //           get_suitable_sets(sets, greedy_cost * quality_threshold_);
-  //
-  //       std::uniform_int_distribution<size_t> dist(0, suitable_sets.size() -
-  //       1); chosen_set = suitable_sets[dist(engine_)];
-  //     }
-  //
-  //     if (sets[chosen_set].elements.empty()) {
-  //       break;
-  //     }
-  //
-  //     result.push_back(chosen_set);
-  //
-  //     for (size_t i = 0; i < sets_count; ++i) {
-  //       if (i == chosen_set) {
-  //         continue;
-  //       }
-  //
-  //       for (size_t element : sets[chosen_set].elements) {
-  //         sets[i].elements.erase(element);
-  //       }
-  //     }
-  //     sets[chosen_set].elements.clear();
-  //   }
-  //
-  //   return Solution{std::move(result)};
-  // }
   std::optional<std::pair<Solution, size_t>> iteration(const Problem& problem,
                                                        CoveringSetsPack& pack,
                                                        size_t best_score) {

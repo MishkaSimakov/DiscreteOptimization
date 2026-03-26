@@ -1,18 +1,18 @@
 #include <iostream>
 
-#include "coloring/Evaluator.h"
-#include "coloring/Output.h"
-#include "coloring/Reader.h"
-#include "coloring/minizinc/CliqueFinder.h"
-#include "coloring/minizinc/Generator.h"
-#include "coloring/preprocessing/ConnectedComponents.h"
-#include "coloring/preprocessing/NeighborhoodInclusion.h"
-#include "coloring/preprocessing/SeparatingCliques.h"
-#include "coloring/solvers/Avarice.h"
-#include "coloring/solvers/DSatur.h"
-#include "coloring/solvers/Greedy.h"
-#include "helpers/Files.h"
-#include "helpers/Time.h"
+#include "../helpers/Files.h"
+#include "../helpers/Time.h"
+#include "Evaluator.h"
+#include "Output.h"
+#include "Reader.h"
+#include "minizinc/CliqueFinder.h"
+#include "minizinc/Generator.h"
+#include "preprocessing/ConnectedComponents.h"
+#include "preprocessing/NeighborhoodInclusion.h"
+#include "preprocessing/SeparatingCliques.h"
+#include "solvers/Avarice.h"
+#include "solvers/DSatur.h"
+#include "solvers/Greedy.h"
 
 const std::vector<std::string> kGradedProblems = {
     "gc_50_3", "gc_70_7", "gc_100_5", "gc_250_9", "gc_500_1", "gc_1000_5",

@@ -36,12 +36,12 @@ jobs:
             -DCMAKE_CXX_COMPILER=clang++
 
       - name: Build
-        run: cmake --build build --target ${{ matrix.task }}
+        run: cmake --build build --target ${{ matrix.task }}_grade
 
       - name: Run task
         run: |
           echo "Running ${{ matrix.task }}"
-          ./build/${{ matrix.task }}
+          ./build/${{ matrix.task }}_grade
 
       - name: Upload results
         uses: actions/upload-artifact@v6
@@ -73,7 +73,7 @@ jobs:
             echo "| Instance | Score | Duration (ms) |" >> $GITHUB_STEP_SUMMARY
             echo "|----------|--------|---------------|" >> $GITHUB_STEP_SUMMARY
 
-            files=$(ls "$task_dir"/*_stats.json 2>/dev/null | sort -V || true)
+            files=$(ls "$task_dir"/*_stats.json 2>/dev/null || true)
 
             if [ -z "$files" ]; then
               echo "| (no data) | - | - |" >> $GITHUB_STEP_SUMMARY
