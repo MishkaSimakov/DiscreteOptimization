@@ -61,7 +61,8 @@ class SimulatedAnnealing {
     }
   }
 
-  std::vector<size_t> remove_random_sets(Solution& solution,
+  std::vector<size_t> remove_random_sets(const Problem& problem,
+                                         Solution& solution,
                                          const size_t count) {
     std::vector<size_t> removed_sets;
 
@@ -91,8 +92,8 @@ class SimulatedAnnealing {
     constexpr double relative_start_temperature = 1e-2;
     constexpr double relative_end_temperature = 1e-9;
     constexpr double alpha = 0.99;  // temperature change rate
-    constexpr size_t start_removed_sets_count = 2;
-    constexpr size_t iterations_per_temperature = 100;
+    constexpr size_t start_removed_sets_count = 4;
+    constexpr size_t iterations_per_temperature = 5;
     // square root of neighborhood size
     const size_t taboo_duration =
         std::pow(static_cast<double>(initial_solution.chosen_sets.size()),
@@ -118,7 +119,8 @@ class SimulatedAnnealing {
 
     while (temperature > end_temperature) {
       // remove random sets from the solution
-      auto removed = remove_random_sets(current_solution, removed_sets_count);
+      auto removed =
+          remove_random_sets(problem, current_solution, removed_sets_count);
 
       size_t hash = unordered_vector_hash(removed);
       auto [itr, inserted] = taboo_list.emplace(hash, iteration);
@@ -126,7 +128,23 @@ class SimulatedAnnealing {
       if (inserted || itr->second + taboo_duration < iteration) {
         // restore solution feasibility
         size_t prev_size = current_solution.chosen_sets.size();
-        finish_solution(problem, current_solution, pack);
+
+        Solution best_finished;
+        size_t best_finished_cost = 1e10;  // infinity
+
+        for (size_t i = 0; i < 10; ++i) {
+          finish_solution(problem, current_solution, pack);
+
+          size_t cost = get_score(problem, current_solution);
+          if (cost < best_finished_cost) {
+            best_finished = current_solution;
+            best_finished_cost = cost;
+          }
+
+          current_solution.chosen_sets.resize(prev_size);
+        }
+
+        current_solution = std::move(best_finished);
 
         itr->second = iteration;
         size_t new_cost = get_score(problem, current_solution);

@@ -14,7 +14,7 @@ const std::vector<std::string> kGradedProblems = {
     // "sc_157_0",  "sc_330_0",   "sc_1000_11",
     // "sc_5000_1", "sc_10000_5", "sc_10000_2",
 
-    "sc_10000_5",
+    "sc_5000_1",
 };
 
 void solve(const std::string& problem_name) {
