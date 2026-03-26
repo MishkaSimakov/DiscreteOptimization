@@ -9,41 +9,38 @@
 #include "solvers/HillClimber.h"
 
 using namespace std::chrono_literals;
+using namespace setcover;
 
-const std::vector<std::string> kGradedProblems = {
-    "sc_157_0",  "sc_330_0",   "sc_1000_11",
-    "sc_5000_1", "sc_10000_5", "sc_10000_2",
-};
+Solution solve(const Problem& problem) {
+  return GRASP(0.1, 0.4, timing::Deadline::after(60s)).solve(problem);
+}
 
-void solve(const std::string& problem_name) {
+int main(int argc, char** argv) {
+  if (argc != 2) {
+    throw std::invalid_argument("Wrong number of arguments");
+  }
+
+  std::string problem_name = argv[1];
+
   auto path = files::problem_path(1, problem_name);
-  auto problem = setcover::read_problem(path);
+  auto problem = read_problem(path);
 
   std::println("solving {}, #elements = {}, #sets = {}",
                path.filename().string(), problem.elements_count,
                problem.sets.size());
 
-  setcover::Solution solution;
+  Solution solution;
 
-  auto duration = timing::timeit([&] {
-    solution =
-        setcover::GRASP(0.1, 0.4, timing::Deadline::after(60s)).solve(problem);
-  });
+  auto duration = timing::timeit([&] { solution = solve(problem); });
 
-  auto evaluation = setcover::evaluate(problem, solution);
+  auto evaluation = evaluate(problem, solution);
 
   if (!evaluation.is_valid) {
     throw std::runtime_error("Solution is invalid");
   }
 
-  setcover::Statistics stats(evaluation, duration);
-  setcover::Output().store(problem_name, solution, stats);
-}
-
-int main() {
-  for (const auto& problem_name : kGradedProblems) {
-    solve(problem_name);
-  }
+  Statistics stats(evaluation, duration);
+  Output().store(problem_name, solution, stats);
 
   return 0;
 }
