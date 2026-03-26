@@ -9,6 +9,7 @@ namespace coloring {
 
 inline Graph read_problem(const std::filesystem::path& path) {
   std::ifstream is(path);
+
   if (!is) {
     throw std::runtime_error("Failed to open problem file.");
   }

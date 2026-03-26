@@ -4,13 +4,51 @@ on:
   push:
 
 jobs:
-  run-task:
+  solve:
     runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
       matrix:
-        task: [ setcover, knapsack, coloring ]
+        include:
+          - task: setcover
+            instance: sc_157_0
+          - task: setcover
+            instance: sc_330_0
+          - task: setcover
+            instance: sc_1000_11
+          - task: setcover
+            instance: sc_5000_1
+          - task: setcover
+            instance: sc_10000_5
+          - task: setcover
+            instance: sc_10000_2
+
+          - task: knapsack
+            instance: ks_30_0
+          - task: knapsack
+            instance: ks_50_0
+          - task: knapsack
+            instance: ks_200_0
+          - task: knapsack
+            instance: ks_400_0
+          - task: knapsack
+            instance: ks_1000_0
+          - task: knapsack
+            instance: ks_10000_0
+
+          - task: coloring
+            instance: gc_50_3
+          - task: coloring
+            instance: gc_70_7
+          - task: coloring
+            instance: gc_100_5
+          - task: coloring
+            instance: gc_250_9
+          - task: coloring
+            instance: gc_500_1
+          - task: coloring
+            instance: gc_1000_5
 
     steps:
       - name: Install jq
@@ -33,60 +71,98 @@ jobs:
         run: |
           cmake -B build -S . \
             -DCMAKE_C_COMPILER=clang \
-            -DCMAKE_CXX_COMPILER=clang++
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
-        run: cmake --build build --target ${{ matrix.task }}
+        run: cmake --build build --target ${{ matrix.task }}_grade
 
       - name: Run task
         run: |
           echo "Running ${{ matrix.task }}"
-          ./build/${{ matrix.task }}
+          ./build/src/${{ matrix.task }}_grade ${{ matrix.instance }}
 
       - name: Upload results
         uses: actions/upload-artifact@v6
         with:
-          name: result-${{ matrix.task }}
+          name: result-${{ matrix.task }}-${{ matrix.instance }}
           path: output/${{ matrix.task }}
+          retention-days: 1
 
-  aggregate:
+  # each instance generates its own solution artifact. It is much nicer to have one merged artifact. This job does exactly this thing.
+  collect-artifacts:
     runs-on: ubuntu-latest
-    needs: run-task
+    needs: solve
 
     steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+
+      - name: Merge results
+        run: |
+          mkdir merged
+          find artifacts -type f -exec cp {} merged/ \;
+
+      - name: Upload merged artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: all-results
+          path: merged/
+
+  generate-summary:
+    runs-on: ubuntu-latest
+    needs: collect-artifacts
+
+    steps:
+      # library for parsing json
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
 
       - name: Download artifacts
         uses: actions/download-artifact@v8
         with:
+          name: all-results
           path: artifacts
 
       - name: Generate summary table
         run: |
           echo "## Task Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
 
-          for task_dir in artifacts/result-*; do
-            task=$(basename "$task_dir" | sed 's/result-//')
+          files=$(ls artifacts/*_stats.json 2>/dev/null || true)
 
+          if [ -z "$files" ]; then
+            echo "_No results found_" >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+
+          # Extract unique task names
+          tasks=$(for f in $files; do
+            basename "$f" _stats.json | cut -d'_' -f1
+          done | sort -u)
+
+          for task in $tasks; do
             echo "### $task" >> $GITHUB_STEP_SUMMARY
             echo "| Instance | Score | Duration (ms) |" >> $GITHUB_STEP_SUMMARY
             echo "|----------|--------|---------------|" >> $GITHUB_STEP_SUMMARY
 
-            files=$(ls "$task_dir"/*_stats.json 2>/dev/null | sort -V || true)
+            task_files=$(ls artifacts/${task}_*_stats.json 2>/dev/null | sort -V || true)
 
-            if [ -z "$files" ]; then
+            if [ -z "$task_files" ]; then
               echo "| (no data) | - | - |" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
               continue
             fi
 
-            for file in $files; do
-              base=$(basename "$file" _stats.json)
+            for file in $task_files; do
+              name=$(basename "$file" _stats.json)
 
               score=$(jq '.score' "$file")
               duration=$(jq '.duration' "$file")
 
-              echo "| $base | $score | $duration |" >> $GITHUB_STEP_SUMMARY
+              echo "| $name | $score | $duration |" >> $GITHUB_STEP_SUMMARY
             done
 
             echo "" >> $GITHUB_STEP_SUMMARY

@@ -3,6 +3,8 @@
 #include <optional>
 #include <random>
 
+#include "HillClimber.h"
+#include "SimulatedAnnealing.h"
 #include "setcover/CoveringSetsPack.h"
 #include "setcover/Types.h"
 
@@ -13,15 +15,15 @@ class GRASP {
 
   // Температура 1 - всегда выбираем случайное (не слишком плохое) множество.
   // Температура 0 - жадный алгоритм.
-  double temperature_;
+  const double temperature;
 
   // Порог на выбор случайного множества. Пусть множество, которое выбрал бы
   // жадный алгоритм имеет относительную стоимость l. Тогда случайное множество
   // будет выбираться так, чтобы его относительная стоимость была хотя бы l *
   // quality_threshold_
-  double quality_threshold_;
+  const double quality_threshold;
 
-  std::chrono::milliseconds time_limit_;
+  const timing::Deadline deadline;
 
   static std::pair<size_t, double> argmax_set(
       const std::vector<CoveringSet>& sets) {
@@ -57,53 +59,9 @@ class GRASP {
     return result;
   }
 
-  // Solution iteration(const Problem& problem) {
-  //   size_t sets_count = problem.sets.size();
-  //
-  //   std::uniform_real_distribution<double> coin(0, 1);
-  //
-  //   std::vector<size_t> result;
-  //
-  //   // копируем все множества, так как далее из них будут убираться уже
-  //   покрытые
-  //   // элементы
-  //   auto sets = problem.sets;
-  //
-  //   while (true) {
-  //     auto [greedy_set, greedy_cost] = argmax_set(sets);
-  //
-  //     size_t chosen_set = greedy_set;
-  //     if (coin(engine_) < temperature_) {
-  //       auto suitable_sets =
-  //           get_suitable_sets(sets, greedy_cost * quality_threshold_);
-  //
-  //       std::uniform_int_distribution<size_t> dist(0, suitable_sets.size() -
-  //       1); chosen_set = suitable_sets[dist(engine_)];
-  //     }
-  //
-  //     if (sets[chosen_set].elements.empty()) {
-  //       break;
-  //     }
-  //
-  //     result.push_back(chosen_set);
-  //
-  //     for (size_t i = 0; i < sets_count; ++i) {
-  //       if (i == chosen_set) {
-  //         continue;
-  //       }
-  //
-  //       for (size_t element : sets[chosen_set].elements) {
-  //         sets[i].elements.erase(element);
-  //       }
-  //     }
-  //     sets[chosen_set].elements.clear();
-  //   }
-  //
-  //   return Solution{std::move(result)};
-  // }
-  std::optional<std::pair<Solution, size_t>> iteration(const Problem& problem,
-                                                       CoveringSetsPack& pack,
-                                                       size_t best_score) {
+  std::pair<Solution, size_t> iteration(const Problem& problem,
+                                        CoveringSetsPack& pack,
+                                        size_t best_score) {
     std::uniform_real_distribution<double> coin(0, 1);
     std::vector<size_t> result;
 
@@ -119,9 +77,9 @@ class GRASP {
       }
 
       size_t chosen_set = greedy_set->first;
-      if (coin(engine_) < temperature_) {
+      if (coin(engine_) < temperature) {
         auto suitable_sets =
-            pack.get_covering_sets(greedy_set->second * quality_threshold_);
+            pack.get_default_sets(greedy_set->second * quality_threshold);
 
         std::uniform_int_distribution<size_t> dist(0, suitable_sets.size() - 1);
         chosen_set = suitable_sets[dist(engine_)];
@@ -129,11 +87,7 @@ class GRASP {
 
       current_score += problem.sets[chosen_set].cost;
       result.push_back(chosen_set);
-      pack.cover_set(chosen_set);
-
-      if (current_score > best_score) {
-        return std::nullopt;
-      }
+      pack.include_set(chosen_set);
     }
 
     return std::pair{Solution{std::move(result)}, current_score};
@@ -141,39 +95,36 @@ class GRASP {
 
  public:
   explicit GRASP(double temperature, double quality_threshold,
-                 std::chrono::milliseconds time_limit)
-      : temperature_(temperature),
-        quality_threshold_(quality_threshold),
-        time_limit_(time_limit) {}
+                 timing::Deadline deadline)
+      : temperature(temperature),
+        quality_threshold(quality_threshold),
+        deadline(deadline) {}
 
   Solution solve(const Problem& problem) {
-    auto start_time = std::chrono::high_resolution_clock::now();
-
     CoveringSetsPack pack(problem);
     Solution best_solution;
     size_t best_score = 1e10;  // infinity
 
     size_t iterations_cnt = 0;
 
+    SimulatedAnnealing annealing(deadline);
+
     while (true) {
       ++iterations_cnt;
 
-      auto current_time = std::chrono::high_resolution_clock::now();
-
-      if (duration_cast<std::chrono::milliseconds>(current_time - start_time) >
-          time_limit_) {
+      if (deadline.is_over()) {
         break;
       }
 
       auto result = iteration(problem, pack, best_score);
 
-      if (!result) {
-        continue;
-      }
+      // improve solution using Simulated Annealing
+      auto improved = annealing.solve(problem, result.first);
+      size_t cost = get_score(problem, improved);
 
-      if (result->second < best_score) {
-        best_score = result->second;
-        best_solution = std::move(result->first);
+      if (cost < best_score) {
+        best_score = cost;
+        best_solution = std::move(improved);
       }
     }
 
