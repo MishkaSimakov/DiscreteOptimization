@@ -10,25 +10,33 @@
 
 namespace setcover {
 
+enum class SetState { DEFAULT, INCLUDED, EXCLUDED };
+
 // Структура данных для работы жадноподобных алгоритмов
 // Для каждого элемента хранит множества, которые его покрывают
 class CoveringSetsPack {
   const Problem& problem_;
 
+  // for each element stores sets covering it
   std::vector<size_t> sets_;
   std::vector<size_t> begins_;
 
+  // uncovered elements mask
   std::vector<bool> mask_;
+
+  // current size of each set (excluding already covered elements)
   std::vector<size_t> current_sizes_;
 
-  std::unordered_set<size_t> removed_sets_;
+  // for each set stores its state
+  std::vector<SetState> states_;
 
  public:
   explicit CoveringSetsPack(const Problem& problem)
       : problem_(problem),
         begins_(problem.elements_count + 1),
         mask_(problem.elements_count, true),
-        current_sizes_(problem.sets.size()) {
+        current_sizes_(problem.sets.size()),
+        states_(problem.sets.size(), SetState::DEFAULT) {
     for (size_t i = 0; i < problem.elements_count; ++i) {
       begins_[i] = sets_.size();
 
@@ -46,18 +54,35 @@ class CoveringSetsPack {
     }
   }
 
-  void remove_set(size_t set_index) { removed_sets_.insert(set_index); }
+  void exclude_set(size_t set_index) {
+    assert(states_[set_index] == SetState::DEFAULT);
 
-  void cover_set(size_t set_index) {
-    for (size_t element : problem_.sets[set_index].elements) {
+    states_[set_index] = SetState::EXCLUDED;
+  }
+
+  void include_set(size_t set_index) {
+    assert(states_[set_index] == SetState::DEFAULT);
+
+    states_[set_index] = SetState::INCLUDED;
+
+    for (const size_t element : problem_.sets[set_index].elements) {
       if (mask_[element]) {
         mask_[element] = false;
 
-        for (size_t i = begins_[element]; i < begins_[element + 1]; ++i) {
-          --current_sizes_[sets_[i]];
+        for (const size_t set : get_sets_covering(element)) {
+          --current_sizes_[set];
         }
       }
     }
+  }
+
+  bool is_covered(size_t element) const { return !mask_[element]; }
+
+  SetState get_set_state(size_t set) const { return states_[set]; }
+
+  std::span<const size_t> get_sets_covering(size_t element) const {
+    return std::span{sets_.begin() + begins_[element],
+                     sets_.begin() + begins_[element + 1]};
   }
 
   std::optional<double> get_min_covering_cost(size_t element) {
@@ -68,22 +93,24 @@ class CoveringSetsPack {
 
     Minimum<double> covering_cost;
 
-    for (size_t i = begins_[element]; i < begins_[element + 1]; ++i) {
-      if (!removed_sets_.contains(sets_[i])) {
+    for (const size_t set : get_sets_covering(element)) {
+      if (states_[set] == SetState::DEFAULT) {
         covering_cost.record(
-            static_cast<double>(problem_.sets[sets_[i]].cost) /
-            static_cast<double>(problem_.sets[sets_[i]].elements.size()));
+            static_cast<double>(problem_.sets[set].cost) /
+            static_cast<double>(problem_.sets[set].elements.size()));
       }
     }
 
     return covering_cost.min();
   }
 
-  std::vector<size_t> get_covering_sets(double threshold) const {
+  // Returns all sets that are not included or excluded.
+  // Only sets with relative cost >= threshold are returned.
+  std::vector<size_t> get_default_sets(double threshold) const {
     std::vector<size_t> result;
 
     for (size_t i = 0; i < problem_.sets.size(); ++i) {
-      if (removed_sets_.contains(i)) {
+      if (states_[i] != SetState::DEFAULT || current_sizes_[i] == 0) {
         continue;
       }
 
@@ -103,7 +130,7 @@ class CoveringSetsPack {
     size_t max_cost_index = 0;
 
     for (size_t i = 0; i < problem_.sets.size(); ++i) {
-      if (removed_sets_.contains(i)) {
+      if (states_[i] != SetState::DEFAULT) {
         continue;
       }
 
@@ -123,7 +150,7 @@ class CoveringSetsPack {
 
   void reset() {
     std::ranges::fill(mask_, true);
-    removed_sets_.clear();
+    std::ranges::fill(states_, SetState::DEFAULT);
 
     for (size_t i = 0; i < problem_.sets.size(); ++i) {
       current_sizes_[i] = problem_.sets[i].elements.size();

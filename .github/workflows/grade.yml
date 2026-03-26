@@ -87,6 +87,7 @@ jobs:
         with:
           name: result-${{ matrix.task }}-${{ matrix.instance }}
           path: output/${{ matrix.task }}
+          retention-days: 1
 
   # each instance generates its own solution artifact. It is much nicer to have one merged artifact. This job does exactly this thing.
   collect-artifacts:
@@ -158,13 +159,10 @@ jobs:
             for file in $task_files; do
               name=$(basename "$file" _stats.json)
 
-              # remove "task_" prefix → get instance
-              instance=${name#${task}_}
-
               score=$(jq '.score' "$file")
               duration=$(jq '.duration' "$file")
 
-              echo "| $instance | $score | $duration |" >> $GITHUB_STEP_SUMMARY
+              echo "| $name | $score | $duration |" >> $GITHUB_STEP_SUMMARY
             done
 
             echo "" >> $GITHUB_STEP_SUMMARY

@@ -167,7 +167,7 @@ class Constructive {
         result.push_back(set_index);
         pack_.cover_set(set_index);
       } else {
-        pack_.remove_set(set_index);
+        pack_.exclude_set(set_index);
       }
     }
 

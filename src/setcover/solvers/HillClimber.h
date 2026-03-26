@@ -17,7 +17,7 @@ class HillClimber {
     CoveringSetsPack pack(problem);
 
     for (const size_t set_index : solution.chosen_sets) {
-      pack.cover_set(set_index);
+      pack.include_set(set_index);
     }
 
     // Достраиваем жадным способом
@@ -29,7 +29,7 @@ class HillClimber {
       }
 
       solution.chosen_sets.push_back(chosen_set->first);
-      pack.cover_set(chosen_set->first);
+      pack.include_set(chosen_set->first);
     }
   }
 

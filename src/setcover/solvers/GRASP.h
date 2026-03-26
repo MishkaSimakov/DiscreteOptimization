@@ -4,6 +4,7 @@
 #include <random>
 
 #include "HillClimber.h"
+#include "SimulatedAnnealing.h"
 #include "setcover/CoveringSetsPack.h"
 #include "setcover/Types.h"
 
@@ -78,7 +79,7 @@ class GRASP {
       size_t chosen_set = greedy_set->first;
       if (coin(engine_) < temperature) {
         auto suitable_sets =
-            pack.get_covering_sets(greedy_set->second * quality_threshold);
+            pack.get_default_sets(greedy_set->second * quality_threshold);
 
         std::uniform_int_distribution<size_t> dist(0, suitable_sets.size() - 1);
         chosen_set = suitable_sets[dist(engine_)];
@@ -86,11 +87,11 @@ class GRASP {
 
       current_score += problem.sets[chosen_set].cost;
       result.push_back(chosen_set);
-      pack.cover_set(chosen_set);
+      pack.include_set(chosen_set);
 
-      if (current_score > best_score) {
-        return std::nullopt;
-      }
+      // if (current_score > best_score) {
+        // return std::nullopt;
+      // }
     }
 
     return std::pair{Solution{std::move(result)}, current_score};
@@ -124,12 +125,13 @@ class GRASP {
       }
 
       // improve solution using Hill Climber if it is not very bad
-      if (result->second < best_score + 10) {
-        auto improved = HillClimber(deadline, 10).solve(problem, result->first);
+      // if (result->second < best_score + 10) {
+        auto improved =
+            SimulatedAnnealing(deadline).solve(problem, result->first);
         size_t cost = get_score(problem, improved);
 
         result = {std::move(improved), cost};
-      }
+      // }
 
       if (result->second < best_score) {
         best_score = result->second;
