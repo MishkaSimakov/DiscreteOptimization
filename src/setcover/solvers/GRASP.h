@@ -3,6 +3,7 @@
 #include <optional>
 #include <random>
 
+#include "HillClimber.h"
 #include "setcover/CoveringSetsPack.h"
 #include "setcover/Types.h"
 
@@ -120,6 +121,14 @@ class GRASP {
 
       if (!result) {
         continue;
+      }
+
+      // improve solution using Hill Climber if it is not very bad
+      if (result->second < best_score + 10) {
+        auto improved = HillClimber(deadline, 10).solve(problem, result->first);
+        size_t cost = get_score(problem, improved);
+
+        result = {std::move(improved), cost};
       }
 
       if (result->second < best_score) {

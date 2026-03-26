@@ -26,12 +26,8 @@ void solve(const std::string& problem_name) {
   setcover::Solution solution;
 
   auto duration = timing::timeit([&] {
-    // 50s GRASP + 10s Hill Climber
-    auto grasp_solution =
-        setcover::GRASP(0.1, 0.4, timing::Deadline::after(50s)).solve(problem);
-
-    solution = setcover::HillClimber(timing::Deadline::after(10s))
-                   .solve(problem, grasp_solution);
+    solution =
+        setcover::GRASP(0.1, 0.4, timing::Deadline::after(60s)).solve(problem);
   });
 
   auto evaluation = setcover::evaluate(problem, solution);

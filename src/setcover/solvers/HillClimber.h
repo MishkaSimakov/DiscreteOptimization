@@ -33,16 +33,6 @@ class HillClimber {
     }
   }
 
-  static size_t get_cost(const Problem& problem, const Solution& solution) {
-    size_t cost = 0;
-
-    for (const size_t set_index : solution.chosen_sets) {
-      cost += problem.sets[set_index].cost;
-    }
-
-    return cost;
-  }
-
  public:
   explicit HillClimber(timing::Deadline deadline,
                        size_t max_iterations_without_change = 50)
@@ -53,7 +43,7 @@ class HillClimber {
     std::default_random_engine engine;
 
     Solution current_solution = initial_solution;
-    size_t current_cost = get_cost(problem, current_solution);
+    size_t current_cost = get_score(problem, current_solution);
 
     size_t iterations_since_change = 0;
 
@@ -71,7 +61,7 @@ class HillClimber {
       // restore solution in a greedy fashion
       finish_solution(problem, new_solution);
 
-      size_t cost = get_cost(problem, new_solution);
+      size_t cost = get_score(problem, new_solution);
 
       // check that we are not in local optimum
       if (cost < current_cost) {
