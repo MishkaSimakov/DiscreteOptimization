@@ -1,5 +1,5 @@
 #include <cmath>
-#include <format>
+#include <print>
 #include <ranges>
 #include <string>
 
@@ -76,6 +76,32 @@ SetCoverRunResult runner(SetCoverConfiguration config) {
   return SetCoverRunResult{scores};
 }
 
+std::vector<SetCoverConfiguration> get_configurations_grid() {
+  std::vector<SetCoverConfiguration> result;
+
+  for (size_t relative_start_temperature_neg_log : {2, 4}) {
+    for (size_t relative_end_temperature_neg_log : {7, 9}) {
+      for (size_t removed_sets_count : {2, 4, 6}) {
+        for (size_t iterations_per_temperature : {5, 50, 100}) {
+          for (size_t iterations_per_move : {2, 5, 10}) {
+            result.push_back(SetCoverConfiguration{
+                .relative_start_temperature_neg_log =
+                    relative_start_temperature_neg_log,
+                .relative_end_temperature_neg_log =
+                    relative_end_temperature_neg_log,
+                .removed_sets_count = removed_sets_count,
+                .iterations_per_temperature = iterations_per_temperature,
+                .iterations_per_move = iterations_per_move,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
 int main() {
   const std::filesystem::path output_directory = "grid_search";
 
@@ -83,17 +109,9 @@ int main() {
 
   GridSearch<SetCoverConfiguration, SetCoverRunResult> search(output_directory);
 
-  SetCoverConfiguration current_best{
-      .relative_start_temperature_neg_log = 2,
-      .relative_end_temperature_neg_log = 9,
-      .removed_sets_count = 4,
-      .iterations_per_temperature = 5,
-      .iterations_per_move = 10,
-  };
-
   search.set_strategy(GridSearchStrategy::RANDOM);
   search.set_runner(runner);
-  search.add_configurations({current_best});
+  search.add_configurations(get_configurations_grid());
 
   search.run();
 }

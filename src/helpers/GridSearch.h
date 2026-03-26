@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <print>
 #include <random>
 #include <vector>
 
@@ -89,6 +90,9 @@ class GridSearch {
   void set_strategy(GridSearchStrategy strategy) { strategy_ = strategy; }
 
   void run() {
+    std::println("Starting grid search through {} configurations.",
+                 configurations_.size());
+
     while (auto config = get_next_configuration()) {
       visit_configuration(*config);
     }

@@ -1,9 +1,8 @@
-cmake_minimum_required(VERSION 3.22)
+cmake_minimum_required(VERSION 3.31)
 project(DiscreteOptimization)
 
 set(CMAKE_CXX_STANDARD 23)
 
-cmake_policy(SET CMP0135 NEW)
 include(FetchContent)
 
 # install raspisator
