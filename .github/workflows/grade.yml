@@ -24,6 +24,8 @@ jobs:
           - task: setcover
             instance: sc_10000_2
 
+          - task: coloring
+            instance: [ gc_50_3, gc_70_7, gc_100_5, gc_250_9, gc_500_1, gc_1000_5 ]
     steps:
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
@@ -69,7 +71,7 @@ jobs:
 
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
 
@@ -79,7 +81,7 @@ jobs:
           find artifacts -type f -exec cp {} merged/ \;
 
       - name: Upload merged artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: all-results
           path: merged/

@@ -41,6 +41,4 @@ int main(int argc, char** argv) {
 
   Statistics stats(evaluation, duration);
   Output().store(problem_name, solution, stats);
-
-  return 0;
 }
