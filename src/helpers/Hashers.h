@@ -85,3 +85,14 @@ struct StreamUnorderedHasher {
     return tuple_hasher_fn(values_sum_, values_xor_, values_mul_);
   }
 };
+
+template <typename T>
+size_t unordered_vector_hash(const std::vector<T>& vector) {
+  StreamUnorderedHasher hasher;
+
+  for (const size_t i : vector) {
+    hasher << i;
+  }
+
+  return hasher.get_hash();
+}

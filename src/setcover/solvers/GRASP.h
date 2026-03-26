@@ -88,10 +88,6 @@ class GRASP {
       current_score += problem.sets[chosen_set].cost;
       result.push_back(chosen_set);
       pack.include_set(chosen_set);
-
-      // if (current_score > best_score) {
-        // return std::nullopt;
-      // }
     }
 
     return std::pair{Solution{std::move(result)}, current_score};
