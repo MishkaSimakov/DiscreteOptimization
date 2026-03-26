@@ -59,9 +59,9 @@ class GRASP {
     return result;
   }
 
-  std::optional<std::pair<Solution, size_t>> iteration(const Problem& problem,
-                                                       CoveringSetsPack& pack,
-                                                       size_t best_score) {
+  std::pair<Solution, size_t> iteration(const Problem& problem,
+                                        CoveringSetsPack& pack,
+                                        size_t best_score) {
     std::uniform_real_distribution<double> coin(0, 1);
     std::vector<size_t> result;
 
@@ -118,21 +118,13 @@ class GRASP {
 
       auto result = iteration(problem, pack, best_score);
 
-      if (!result) {
-        continue;
-      }
-
-      // improve solution using Hill Climber if it is not very bad
-      // if (result->second < best_score + 5) {
-      auto improved = annealing.solve(problem, result->first);
+      // improve solution using Simulated Annealing
+      auto improved = annealing.solve(problem, result.first);
       size_t cost = get_score(problem, improved);
 
-      result = {std::move(improved), cost};
-      // }
-
-      if (result->second < best_score) {
-        best_score = result->second;
-        best_solution = std::move(result->first);
+      if (cost < best_score) {
+        best_score = cost;
+        best_solution = std::move(improved);
       }
     }
 
