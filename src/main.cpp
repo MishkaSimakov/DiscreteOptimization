@@ -1,38 +1,66 @@
 #include <iostream>
 
+#include "coloring/Evaluator.h"
+#include "coloring/Output.h"
+#include "coloring/Reader.h"
+#include "coloring/minizinc/CliqueFinder.h"
+#include "coloring/minizinc/Generator.h"
+#include "coloring/preprocessing/ConnectedComponents.h"
+#include "coloring/preprocessing/NeighborhoodInclusion.h"
+#include "coloring/preprocessing/SeparatingCliques.h"
+#include "coloring/solvers/Avarice.h"
+#include "coloring/solvers/DSatur.h"
+#include "coloring/solvers/Greedy.h"
 #include "helpers/Files.h"
 #include "helpers/Time.h"
-#include "knapsack/Evaluator.h"
-#include "knapsack/Reader.h"
-#include "knapsack/Types.h"
-#include "knapsack/solvers/GRASP.h"
 
 const std::vector<std::string> kGradedProblems = {
-    "ks_30_0", "ks_50_0", "ks_200_0", "ks_400_0", "ks_1000_0", "ks_10000_0",
+    "gc_50_3", "gc_70_7", "gc_100_5", "gc_250_9", "gc_500_1", "gc_1000_5",
 };
 
+using namespace std::chrono_literals;
+
 void solve(const std::filesystem::path& path) {
-  auto problem = knapsack::read_problem(path);
+  auto problem = coloring::read_problem(path);
+  auto problem_name = path.filename().string();
 
-  std::println("solving {}, #items = {}", path.filename().string(),
-               problem.items.size());
+  std::println("solving {}, #nodes = {}", problem_name,
+               problem.adjacent.size());
 
-  auto grasp_solution =
-      knapsack::GRASP(0.01, std::chrono::seconds{30}).solve(problem);
-  auto grasp_evaluation = knapsack::evaluate(problem, grasp_solution);
+  auto greedy_solution = coloring::Greedy().solve(problem);
+  auto greedy_evaluation = coloring::evaluate(problem, greedy_solution);
 
-  if (!grasp_evaluation.is_valid) {
-    throw std::runtime_error(
-        "Something went terribly wrong! Solution is invalid");
+  if (!greedy_evaluation.is_valid) {
+    throw std::runtime_error("Invalid solution!");
   }
 
-  std::println("  grasp: {}", grasp_evaluation.score);
+  auto dsatur_solution = coloring::DSatur().solve(problem);
+  auto dsatur_evaluation = coloring::evaluate(problem, dsatur_solution);
+
+  if (!dsatur_evaluation.is_valid) {
+    throw std::runtime_error("Invalid solution!");
+  }
+
+  auto avarice =
+      coloring::Avarice(dsatur_solution, timing::Deadline::after(60s));
+  auto avarice_solution = avarice.solve(problem);
+  auto avarice_evaluation = coloring::evaluate(problem, avarice_solution);
+
+  if (!avarice_evaluation.is_valid) {
+    throw std::runtime_error("Invalid solution!");
+  }
+
+  std::println("  greedy={}, dsatur={}, avarice={}", greedy_evaluation.score,
+               dsatur_evaluation.score, avarice_evaluation.score);
+
+  coloring::Output().store(files::solution_path("coloring", problem_name),
+                           avarice_solution);
 }
 
 int main() {
   auto duration = timing::timeit([] {
     for (const auto& file : kGradedProblems) {
-      solve(files::problem_path(2, file));
+      solve(files::problem_path(3, file));
     }
   });
 

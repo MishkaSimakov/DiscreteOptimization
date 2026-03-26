@@ -1,23 +1,17 @@
 #pragma once
 
-#include <unordered_set>
+#include <chrono>
 #include <vector>
 
-namespace setcover {
+namespace coloring {
 
-struct CoveringSet {
-  size_t cost;
-  std::unordered_set<size_t> elements;
-};
-
-struct Problem {
-  std::vector<CoveringSet> sets;
-
-  size_t elements_count;
+struct Graph {
+  // for each vertex stores adjacency list
+  std::vector<std::vector<size_t>> adjacent;
 };
 
 struct Solution {
-  std::vector<size_t> chosen_sets;
+  std::vector<size_t> colors;
 };
 
 struct EvaluationResult {
@@ -32,4 +26,4 @@ struct Statistics : EvaluationResult {
       : EvaluationResult(evaluation), duration(duration) {}
 };
 
-}  // namespace setcover
+}  // namespace coloring
