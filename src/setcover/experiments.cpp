@@ -23,7 +23,8 @@ void solve(const std::string& problem_name) {
                path.filename().string(), problem.elements_count,
                problem.sets.size());
 
-  auto grasp_solution = setcover::GRASP(0.1, 0.4, 10s).solve(problem);
+  auto grasp_solution =
+      setcover::GRASP(0.1, 0.4, timing::Deadline::after(10s)).solve(problem);
   auto grasp_evaluation = setcover::evaluate(problem, grasp_solution);
 
   if (!grasp_evaluation.is_valid) {
@@ -31,7 +32,7 @@ void solve(const std::string& problem_name) {
   }
 
   auto hill_climber_solution =
-      setcover::HillClimber(timing::Deadline::after(10s))
+      setcover::HillClimber(timing::Deadline::after(50s))
           .solve(problem, grasp_solution);
   auto hill_climber_evaluation =
       setcover::evaluate(problem, hill_climber_solution);

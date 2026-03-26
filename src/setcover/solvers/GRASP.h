@@ -13,15 +13,15 @@ class GRASP {
 
   // Температура 1 - всегда выбираем случайное (не слишком плохое) множество.
   // Температура 0 - жадный алгоритм.
-  double temperature_;
+  const double temperature;
 
   // Порог на выбор случайного множества. Пусть множество, которое выбрал бы
   // жадный алгоритм имеет относительную стоимость l. Тогда случайное множество
   // будет выбираться так, чтобы его относительная стоимость была хотя бы l *
   // quality_threshold_
-  double quality_threshold_;
+  const double quality_threshold;
 
-  std::chrono::milliseconds time_limit_;
+  const timing::Deadline deadline;
 
   static std::pair<size_t, double> argmax_set(
       const std::vector<CoveringSet>& sets) {
@@ -75,9 +75,9 @@ class GRASP {
       }
 
       size_t chosen_set = greedy_set->first;
-      if (coin(engine_) < temperature_) {
+      if (coin(engine_) < temperature) {
         auto suitable_sets =
-            pack.get_covering_sets(greedy_set->second * quality_threshold_);
+            pack.get_covering_sets(greedy_set->second * quality_threshold);
 
         std::uniform_int_distribution<size_t> dist(0, suitable_sets.size() - 1);
         chosen_set = suitable_sets[dist(engine_)];
@@ -97,14 +97,12 @@ class GRASP {
 
  public:
   explicit GRASP(double temperature, double quality_threshold,
-                 std::chrono::milliseconds time_limit)
-      : temperature_(temperature),
-        quality_threshold_(quality_threshold),
-        time_limit_(time_limit) {}
+                 timing::Deadline deadline)
+      : temperature(temperature),
+        quality_threshold(quality_threshold),
+        deadline(deadline) {}
 
   Solution solve(const Problem& problem) {
-    auto start_time = std::chrono::high_resolution_clock::now();
-
     CoveringSetsPack pack(problem);
     Solution best_solution;
     size_t best_score = 1e10;  // infinity
@@ -114,10 +112,7 @@ class GRASP {
     while (true) {
       ++iterations_cnt;
 
-      auto current_time = std::chrono::high_resolution_clock::now();
-
-      if (duration_cast<std::chrono::milliseconds>(current_time - start_time) >
-          time_limit_) {
+      if (deadline.is_over()) {
         break;
       }
 

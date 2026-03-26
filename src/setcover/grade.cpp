@@ -6,6 +6,9 @@
 #include "setcover/Evaluator.h"
 #include "setcover/Reader.h"
 #include "setcover/solvers/GRASP.h"
+#include "solvers/HillClimber.h"
+
+using namespace std::chrono_literals;
 
 const std::vector<std::string> kGradedProblems = {
     "sc_157_0",  "sc_330_0",   "sc_1000_11",
@@ -22,20 +25,22 @@ void solve(const std::string& problem_name) {
 
   setcover::Solution solution;
 
-  auto duration = timing::timeit([&]() {
-    solution =
-        setcover::GRASP(0.1, 0.4, std::chrono::seconds{60}).solve(problem);
+  auto duration = timing::timeit([&] {
+    // 50s GRASP + 10s Hill Climber
+    auto grasp_solution =
+        setcover::GRASP(0.1, 0.4, timing::Deadline::after(50s)).solve(problem);
+
+    solution = setcover::HillClimber(timing::Deadline::after(10s))
+                   .solve(problem, grasp_solution);
   });
 
-  auto grasp_evaluation = setcover::evaluate(problem, solution);
+  auto evaluation = setcover::evaluate(problem, solution);
 
-  if (!grasp_evaluation.is_valid) {
-    throw std::runtime_error(
-        "Something went terribly wrong! Solution is invalid");
+  if (!evaluation.is_valid) {
+    throw std::runtime_error("Solution is invalid");
   }
 
-  setcover::Statistics stats(grasp_evaluation, duration);
-
+  setcover::Statistics stats(evaluation, duration);
   setcover::Output().store(problem_name, solution, stats);
 }
 
