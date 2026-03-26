@@ -80,6 +80,11 @@ class CoveringSetsPack {
 
   SetState get_set_state(size_t set) const { return states_[set]; }
 
+  double get_relative_cost(size_t set) const {
+    return static_cast<double>(problem_.sets[set].cost) /
+           static_cast<double>(problem_.sets[set].elements.size());
+  }
+
   std::span<const size_t> get_sets_covering(size_t element) const {
     return std::span{sets_.begin() + begins_[element],
                      sets_.begin() + begins_[element + 1]};

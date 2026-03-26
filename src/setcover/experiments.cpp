@@ -26,9 +26,7 @@ void solve(const std::string& problem_name) {
                problem.sets.size());
 
   auto grasp_solution =
-      setcover::GRASP(50. / static_cast<double>(problem.sets.size()), 0.4,
-                      timing::Deadline::after(60s))
-          .solve(problem);
+      setcover::GRASP(0.1, 0.4, timing::Deadline::after(60s)).solve(problem);
   auto grasp_evaluation = setcover::evaluate(problem, grasp_solution);
 
   if (!grasp_evaluation.is_valid) {

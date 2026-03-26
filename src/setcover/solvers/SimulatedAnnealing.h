@@ -36,25 +36,26 @@ class SimulatedAnnealing {
 
       auto sets = pack.get_sets_covering(i);
 
-      size_t default_count = 0;
+      // set with small relative cost is more likely
+      double sum = 0;
       for (const size_t set : sets) {
         if (pack.get_set_state(set) == SetState::DEFAULT) {
-          ++default_count;
+          sum += 1. / pack.get_relative_cost(set);
         }
       }
 
-      size_t index = random_index(default_count);
+      double value = std::uniform_real_distribution<>(0, sum)(engine_);
 
       for (const size_t set : sets) {
         if (pack.get_set_state(set) == SetState::DEFAULT) {
-          if (index == 0) {
+          value -= 1. / pack.get_relative_cost(set);
+
+          if (value <= 0) {
             solution.chosen_sets.push_back(set);
             pack.include_set(set);
 
             break;
           }
-
-          --index;
         }
       }
     }
@@ -90,7 +91,7 @@ class SimulatedAnnealing {
     constexpr double relative_start_temperature = 1e-2;
     constexpr double relative_end_temperature = 1e-9;
     constexpr double alpha = 0.99;  // temperature change rate
-    constexpr size_t start_removed_sets_count = 3;
+    constexpr size_t start_removed_sets_count = 2;
     constexpr size_t iterations_per_temperature = 100;
     // square root of neighborhood size
     const size_t taboo_duration =
@@ -104,7 +105,7 @@ class SimulatedAnnealing {
     Solution current_solution = initial_solution;
     size_t current_cost = get_score(problem, current_solution);
 
-    Solution best_solution = initial_solution;
+    Solution best_solution = current_solution;
     size_t best_cost = current_cost;
 
     size_t removed_sets_count = start_removed_sets_count;
@@ -145,7 +146,6 @@ class SimulatedAnnealing {
             std::print("{} -> ", new_cost);
             std::cout << std::flush;
           }
-
         } else {
           // rollback changes
           current_solution.chosen_sets.resize(prev_size);
