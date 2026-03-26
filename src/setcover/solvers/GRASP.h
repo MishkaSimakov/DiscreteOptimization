@@ -107,6 +107,8 @@ class GRASP {
 
     size_t iterations_cnt = 0;
 
+    SimulatedAnnealing annealing(deadline);
+
     while (true) {
       ++iterations_cnt;
 
@@ -121,12 +123,11 @@ class GRASP {
       }
 
       // improve solution using Hill Climber if it is not very bad
-      // if (result->second < best_score + 10) {
-        auto improved =
-            SimulatedAnnealing(deadline).solve(problem, result->first);
-        size_t cost = get_score(problem, improved);
+      // if (result->second < best_score + 5) {
+      auto improved = annealing.solve(problem, result->first);
+      size_t cost = get_score(problem, improved);
 
-        result = {std::move(improved), cost};
+      result = {std::move(improved), cost};
       // }
 
       if (result->second < best_score) {

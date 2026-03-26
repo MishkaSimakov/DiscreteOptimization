@@ -88,14 +88,14 @@ class SimulatedAnnealing {
     std::uniform_real_distribution<double> random_accept(0, 1);
 
     constexpr double relative_start_temperature = 1e-2;
-    constexpr double relative_end_temperature = 1e-7;
+    constexpr double relative_end_temperature = 1e-9;
     constexpr double alpha = 0.99;  // temperature change rate
-    constexpr size_t removed_sets_count = 3;
+    constexpr size_t start_removed_sets_count = 3;
     constexpr size_t iterations_per_temperature = 100;
     // square root of neighborhood size
     const size_t taboo_duration =
         std::pow(static_cast<double>(initial_solution.chosen_sets.size()),
-                 static_cast<double>(removed_sets_count) / 2);
+                 static_cast<double>(start_removed_sets_count) / 2);
 
     // (move hash, last iteration when it was used)
     std::unordered_map<size_t, size_t> taboo_list;
@@ -107,6 +107,8 @@ class SimulatedAnnealing {
     Solution best_solution = initial_solution;
     size_t best_cost = current_cost;
 
+    size_t removed_sets_count = start_removed_sets_count;
+
     double temperature = relative_start_temperature * current_cost;
     const double end_temperature = relative_end_temperature * current_cost;
     size_t iteration = 0;
@@ -117,16 +119,14 @@ class SimulatedAnnealing {
       // remove random sets from the solution
       auto removed = remove_random_sets(current_solution, removed_sets_count);
 
-      // restore solution feasibility
-      size_t prev_size = current_solution.chosen_sets.size();
-      finish_solution(problem, current_solution, pack);
-
       size_t hash = unordered_vector_hash(removed);
       auto [itr, inserted] = taboo_list.emplace(hash, iteration);
 
-      bool applied_transformation = false;
-
       if (inserted || itr->second + taboo_duration < iteration) {
+        // restore solution feasibility
+        size_t prev_size = current_solution.chosen_sets.size();
+        finish_solution(problem, current_solution, pack);
+
         itr->second = iteration;
         size_t new_cost = get_score(problem, current_solution);
 
@@ -141,18 +141,21 @@ class SimulatedAnnealing {
           if (current_cost < best_cost) {
             best_cost = current_cost;
             best_solution = current_solution;
+
+            std::print("{} -> ", new_cost);
+            std::cout << std::flush;
           }
 
-          std::print("{} -> ", new_cost);
-          std::cout << std::flush;
-          applied_transformation = true;
+        } else {
+          // rollback changes
+          current_solution.chosen_sets.resize(prev_size);
+
+          for (const size_t set : removed) {
+            current_solution.chosen_sets.push_back(set);
+          }
         }
-      }
-
-      if (!applied_transformation) {
+      } else {
         // rollback changes
-        current_solution.chosen_sets.resize(prev_size);
-
         for (const size_t set : removed) {
           current_solution.chosen_sets.push_back(set);
         }

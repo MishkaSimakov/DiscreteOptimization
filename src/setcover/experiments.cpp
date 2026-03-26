@@ -14,7 +14,7 @@ const std::vector<std::string> kGradedProblems = {
     // "sc_157_0",  "sc_330_0",   "sc_1000_11",
     // "sc_5000_1", "sc_10000_5", "sc_10000_2",
 
-  "sc_5000_1"
+    "sc_10000_5",
 };
 
 void solve(const std::string& problem_name) {
@@ -26,7 +26,9 @@ void solve(const std::string& problem_name) {
                problem.sets.size());
 
   auto grasp_solution =
-      setcover::GRASP(0.1, 0.4, timing::Deadline::after(60s)).solve(problem);
+      setcover::GRASP(50. / static_cast<double>(problem.sets.size()), 0.4,
+                      timing::Deadline::after(60s))
+          .solve(problem);
   auto grasp_evaluation = setcover::evaluate(problem, grasp_solution);
 
   if (!grasp_evaluation.is_valid) {
