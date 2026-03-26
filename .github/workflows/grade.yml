@@ -33,7 +33,7 @@ jobs:
         run: |
           cmake -B build -S . \
             -DCMAKE_C_COMPILER=clang \
-            -DCMAKE_CXX_COMPILER=clang++
+            -DCMAKE_CXX_COMPILER=clang++ 
 
       - name: Build
         run: cmake --build build --target ${{ matrix.task }}_grade
@@ -41,7 +41,7 @@ jobs:
       - name: Run task
         run: |
           echo "Running ${{ matrix.task }}"
-          ./build/${{ matrix.task }}_grade
+          ./build/src/${{ matrix.task }}_grade
 
       - name: Upload results
         uses: actions/upload-artifact@v6
