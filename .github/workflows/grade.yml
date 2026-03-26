@@ -12,18 +12,18 @@ jobs:
       matrix:
         task: [ setcover ]
         include:
-          - task: setcover
-            instance: sc_157_0
-          - task: setcover
-            instance: sc_330_0
-          - task: setcover
-            instance: sc_1000_11
-          - task: setcover
-            instance: sc_5000_1
-          - task: setcover
-            instance: sc_10000_5
-          - task: setcover
-            instance: sc_10000_2
+          - instance: sc_157_0
+            task: setcover
+          - instance: sc_330_0
+            task: setcover
+          - instance: sc_1000_11
+            task: setcover
+          - instance: sc_5000_1
+            task: setcover
+          - instance: sc_10000_5
+            task: setcover
+          - instance: sc_10000_2
+            task: setcover
 
     steps:
       - name: Install jq
