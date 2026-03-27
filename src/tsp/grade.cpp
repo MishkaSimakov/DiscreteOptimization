@@ -3,16 +3,14 @@
 #include "Output.h"
 #include "helpers/Files.h"
 #include "helpers/Time.h"
-#include "setcover/Evaluator.h"
-#include "setcover/Reader.h"
-#include "setcover/solvers/GRASP.h"
-#include "solvers/HillClimber.h"
+#include "tsp/Evaluator.h"
+#include "tsp/Reader.h"
 
 using namespace std::chrono_literals;
-using namespace setcover;
+using namespace tsp;
 
 Solution solve(const Problem& problem) {
-  return GRASP(0.1, 0.4, timing::Deadline::after(60s)).solve(problem);
+  throw std::runtime_error("Not implemented");
 }
 
 int main(int argc, char** argv) {
@@ -22,12 +20,8 @@ int main(int argc, char** argv) {
 
   std::string problem_name = argv[1];
 
-  auto path = files::problem_path("setcover", problem_name);
+  auto path = files::problem_path("tsp", problem_name);
   auto problem = read_problem(path);
-
-  std::println("solving {}, #elements = {}, #sets = {}",
-               path.filename().string(), problem.elements_count,
-               problem.sets.size());
 
   Solution solution;
 

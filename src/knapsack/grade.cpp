@@ -22,7 +22,7 @@ int main(int argc, char** argv) {
 
   std::string problem_name = argv[1];
 
-  auto path = files::problem_path(2, problem_name);
+  auto path = files::problem_path("knapsack", problem_name);
   auto problem = read_problem(path);
 
   std::println("solving {}, #items = {}", problem_name, problem.items.size());

@@ -32,7 +32,7 @@ int main(int argc, char** argv) {
 
   std::string problem_name = argv[1];
 
-  auto path = files::problem_path(3, problem_name);
+  auto path = files::problem_path("coloring", problem_name);
   auto problem = read_problem(path);
 
   std::println("solving {}, #nodes = {}", problem_name,
