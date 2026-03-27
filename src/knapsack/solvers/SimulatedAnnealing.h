@@ -11,20 +11,27 @@
 
 namespace knapsack {
 
-class HillClimber {
+struct SimulatedAnnealingConfig {
+  double relative_start_temperature = 1e-5;
+  double relative_end_temperature = 1e-10;
+
+  double alpha = 0.99;
+  size_t iterations_per_temperature = 10;
+};
+
+class SimulatedAnnealing {
+  const SimulatedAnnealingConfig config;
+
   const timing::Deadline deadline;
-  const size_t max_iterations_without_change;
 
   std::multimap<double, size_t, std::greater<>> free_items_;
-
-  size_t iteration_ = 0;
 
   std::default_random_engine random_;
 
   void finish_solution(const Problem& problem, Solution& solution) {
     size_t current_weight = get_weight(problem, solution);
 
-    std::bernoulli_distribution distribution(0.1);
+    std::bernoulli_distribution distribution(0.01);
 
     for (auto itr = free_items_.begin(); itr != free_items_.end();) {
       if (distribution(random_)) {
@@ -47,7 +54,8 @@ class HillClimber {
 
   std::optional<size_t> remove_random_item(Solution& solution,
                                            const std::vector<size_t>& taboo,
-                                           const size_t taboo_duration) {
+                                           const size_t taboo_duration,
+                                           const size_t current_iteration) {
     if (solution.chosen_items.empty()) {
       return std::nullopt;
     }
@@ -63,7 +71,7 @@ class HillClimber {
 
       ++iteration;
     } while (taboo[removed_item] != -1 &&
-             taboo[removed_item] + taboo_duration > iteration_ &&
+             taboo[removed_item] + taboo_duration > current_iteration &&
              iteration < 10);
 
     solution.chosen_items.erase(solution.chosen_items.begin() +
@@ -73,16 +81,20 @@ class HillClimber {
   }
 
  public:
-  explicit HillClimber(timing::Deadline deadline,
-                       size_t max_iterations_without_change = 100)
-      : deadline(deadline),
-        max_iterations_without_change(max_iterations_without_change) {}
+  explicit SimulatedAnnealing(timing::Deadline deadline,
+                              SimulatedAnnealingConfig config)
+      : config(config), deadline(deadline) {}
 
   Solution solve(const Problem& problem, const Solution& initial_solution) {
+    std::uniform_real_distribution<double> random_accept(0, 1);
+
     Solution current_solution = initial_solution;
     size_t current_cost = get_score(problem, current_solution);
 
-    size_t iterations_since_change = 0;
+    Solution best_solution = current_solution;
+    size_t best_cost = current_cost;
+
+    size_t iteration = 0;
 
     const size_t taboo_duration =
         std::ceil(std::sqrt(initial_solution.chosen_items.size()));
@@ -92,23 +104,27 @@ class HillClimber {
       free_items_.emplace(problem.items[i].relative_cost(), i);
     }
 
-    for (size_t item : initial_solution.chosen_items) {
+    for (const size_t item : initial_solution.chosen_items) {
       const auto itr = std::ranges::find_if(
           free_items_,
           [item](std::pair<double, size_t> p) { return p.second == item; });
       free_items_.erase(itr);
     }
 
-    while (true) {
-      auto removed_item =
-          remove_random_item(current_solution, taboo, taboo_duration);
+    double temperature = current_cost * config.relative_start_temperature;
+    const double end_temperature =
+        current_cost * config.relative_end_temperature;
+
+    while (temperature > end_temperature) {
+      auto removed_item = remove_random_item(current_solution, taboo,
+                                             taboo_duration, iteration);
 
       // restore solution in a greedy fashion
       size_t prev_size = current_solution.chosen_items.size();
       finish_solution(problem, current_solution);
 
       if (removed_item) {
-        taboo[*removed_item] = iteration_;
+        taboo[*removed_item] = iteration;
 
         free_items_.emplace(problem.items[*removed_item].relative_cost(),
                             *removed_item);
@@ -116,18 +132,19 @@ class HillClimber {
 
       size_t cost = get_score(problem, current_solution);
 
-      // check that we are not in local optimum
-      if (cost > current_cost) {
-        iterations_since_change = 0;
-      } else {
-        ++iterations_since_change;
-      }
-
       assert(evaluate(problem, current_solution).is_valid);
 
-      // accept new solution if it is better
-      if (cost >= current_cost) {
+      const double delta =
+          static_cast<double>(cost) - static_cast<double>(current_cost);
+
+      if (delta >= 0 ||
+          std::exp(delta / temperature) > random_accept(random_)) {
         current_cost = cost;
+
+        if (current_cost > best_cost) {
+          best_cost = current_cost;
+          best_solution = current_solution;
+        }
       } else {
         // rollback
         for (size_t i = prev_size; i < current_solution.chosen_items.size();
@@ -149,18 +166,20 @@ class HillClimber {
         }
       }
 
-      if (iterations_since_change > max_iterations_without_change) {
-        break;
-      }
-
       if (deadline.is_over()) {
         break;
       }
 
-      ++iteration_;
+      if ((iteration + 1) % config.iterations_per_temperature == 0) {
+        temperature *= config.alpha;
+      }
+
+      ++iteration;
     }
 
-    return current_solution;
+    std::println("  {} -> {}", get_score(problem, initial_solution), best_cost);
+
+    return best_solution;
   }
 };
 

@@ -7,6 +7,7 @@
 #include <unordered_set>
 
 #include "HillClimber.h"
+#include "SimulatedAnnealing.h"
 #include "helpers/Hashers.h"
 #include "knapsack/Evaluator.h"
 #include "knapsack/Types.h"
@@ -86,8 +87,8 @@ class GRASP {
         continue;
       }
 
-      std::cout << "GRASP: " << solution << std::endl;
-      solution = HillClimber(deadline).solve(problem, solution);
+      solution =
+          HillClimber(deadline).solve(problem, solution);
 
       auto evaluation = evaluate(problem, solution);
       assert(evaluation.is_valid);
@@ -95,8 +96,12 @@ class GRASP {
       if (evaluation.score > best_score) {
         best_score = evaluation.score;
         best_solution = std::move(solution);
+
+        std::println("  new best: {}", best_score);
       }
     }
+
+    std::println("iterations: {}", iterations_cnt);
 
     return best_solution;
   }
