@@ -14,7 +14,7 @@
 #include "solvers/DSatur.h"
 #include "solvers/Greedy.h"
 
-const std::vector<std::string> kGradedProblems = {
+const std::vector<std::string> graded_problems = {
     "gc_50_3", "gc_70_7", "gc_100_5", "gc_250_9", "gc_500_1", "gc_1000_5",
 };
 
@@ -59,7 +59,7 @@ void solve(const std::filesystem::path& path) {
 
 int main() {
   auto duration = timing::timeit([] {
-    for (const auto& file : kGradedProblems) {
+    for (const auto& file : graded_problems) {
       solve(files::problem_path(3, file));
     }
   });

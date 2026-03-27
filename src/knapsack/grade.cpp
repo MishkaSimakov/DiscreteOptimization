@@ -12,7 +12,7 @@ using namespace std::chrono_literals;
 using namespace knapsack;
 
 Solution solve(const Problem& problem) {
-  return GRASP(0.01, 60s).solve(problem);
+  return GRASP(0.1, timing::Deadline::after(60s)).solve(problem);
 }
 
 int main(int argc, char** argv) {
