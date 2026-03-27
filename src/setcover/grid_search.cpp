@@ -54,7 +54,7 @@ std::vector<size_t> runner(const gridsearch::Configuration& config) {
     auto problem = setcover::read_problem(path);
 
     auto grasp_solution =
-        setcover::GRASP(temperature, quality, timing::Deadline::after(1s),
+        setcover::GRASP(temperature, quality, timing::Deadline::after(60s),
                         sa_config)
             .solve(problem);
     auto grasp_evaluation = setcover::evaluate(problem, grasp_solution);
