@@ -59,11 +59,16 @@ class HillClimber {
     size_t removed_item_index;
     size_t removed_item;
 
+    size_t iteration = 0;
+
     do {
       removed_item_index = rnd::index(solution.chosen_items.size(), random_);
       removed_item = solution.chosen_items[removed_item_index];
+
+      ++iteration;
     } while (taboo_[removed_item] != -1 &&
-             taboo_[removed_item] + taboo_duration_ > iteration_);
+             taboo_[removed_item] + taboo_duration_ > iteration_ &&
+             iteration < 10);
 
     solution.chosen_items.erase(solution.chosen_items.begin() +
                                 removed_item_index);
@@ -169,10 +174,8 @@ class HillClimber {
       ++iteration_;
     }
 
-    if (current_cost != get_score(problem, initial_solution)) {
-      std::println("  delta={}",
-                   current_cost - get_score(problem, initial_solution));
-    }
+    std::println("  delta={}",
+                       current_cost - get_score(problem, initial_solution));
 
     // std::cout << "after hill climber: " << current_solution
     // << ", score: " << current_cost << std::endl;
