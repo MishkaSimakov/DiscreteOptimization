@@ -10,7 +10,7 @@
 
 using namespace std::chrono_literals;
 
-const std::vector<std::string> kGradedProblems = {
+const std::vector<std::string> graded_problems = {
     // "sc_157_0",  "sc_330_0",   "sc_1000_11",
     // "sc_5000_1", "sc_10000_5", "sc_10000_2",
 
@@ -37,7 +37,7 @@ void solve(const std::string& problem_name) {
 }
 
 int main() {
-  for (const auto& problem_name : kGradedProblems) {
+  for (const auto& problem_name : graded_problems) {
     solve(problem_name);
   }
 
