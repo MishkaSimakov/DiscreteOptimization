@@ -5,7 +5,7 @@ build
 .vscode
 
 output
-grid_search
+/grid_search
 
 # ignore all tasks except those that are graded
 tasks/1/*

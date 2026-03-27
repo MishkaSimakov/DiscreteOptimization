@@ -113,10 +113,6 @@ class GRASP {
     while (true) {
       ++iterations_cnt;
 
-      if (deadline.is_over()) {
-        break;
-      }
-
       auto result = iteration(problem, pack, best_score);
 
       // improve solution using Simulated Annealing
@@ -127,6 +123,10 @@ class GRASP {
       if (cost < best_score) {
         best_score = cost;
         best_solution = std::move(improved);
+      }
+
+      if (deadline.is_over()) {
+        break;
       }
     }
 

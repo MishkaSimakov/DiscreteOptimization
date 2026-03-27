@@ -5,8 +5,8 @@
 
 #include "Reader.h"
 #include "helpers/Files.h"
-#include "helpers/GridSearch.h"
 #include "helpers/Time.h"
+#include "helpers/grid_search/GridSearch.h"
 #include "solvers/GRASP.h"
 #include "utils/String.h"
 
@@ -30,37 +30,32 @@ struct SetCoverConfiguration {
   }
 };
 
-struct SetCoverRunResult {
-  std::vector<size_t> scores;
-
-  std::string serialize() const {
-    return str::join(scores | std::views::transform([](size_t score) {
-                       return std::to_string(score);
-                     }),
-                     ",");
-  }
-};
-
-SetCoverRunResult runner(SetCoverConfiguration config) {
+std::vector<size_t> runner(const gridsearch::Configuration& config) {
   std::vector<size_t> scores;
 
   const setcover::SimulatedAnnealingConfig sa_config{
       .relative_start_temperature =
-          std::pow(0.1, config.relative_start_temperature_neg_log),
+          std::pow(10, config.at("relative_start_temperature_log")),
       .relative_end_temperature =
-          std::pow(0.1, config.relative_end_temperature_neg_log),
+          std::pow(10, config.at("relative_end_temperature_log")),
       .alpha = 0.99,
-      .iterations_per_temperature = config.iterations_per_temperature,
-      .iterations_per_move = config.iterations_per_move,
-      .taboo_duration_multiplier = 1,
+      .iterations_per_temperature =
+          static_cast<size_t>(config.at("iterations_per_temperature")),
+      .iterations_per_move =
+          static_cast<size_t>(config.at("iterations_per_move")),
+      .taboo_duration_multiplier = config.at("taboo_duration_multiplier"),
   };
+
+  double temperature = config.at("grasp_temperature");
+  double quality = config.at("grasp_quality");
 
   for (const auto& problem_name : graded_problems) {
     auto path = files::problem_path(1, problem_name);
     auto problem = setcover::read_problem(path);
 
     auto grasp_solution =
-        setcover::GRASP(0.1, 0.4, timing::Deadline::after(60s), sa_config)
+        setcover::GRASP(temperature, quality, timing::Deadline::after(1s),
+                        sa_config)
             .solve(problem);
     auto grasp_evaluation = setcover::evaluate(problem, grasp_solution);
 
@@ -71,30 +66,7 @@ SetCoverRunResult runner(SetCoverConfiguration config) {
     scores.push_back(grasp_evaluation.score);
   }
 
-  return SetCoverRunResult{scores};
-}
-
-std::vector<SetCoverConfiguration> get_configurations_grid() {
-  std::vector<SetCoverConfiguration> result;
-
-  for (size_t relative_start_temperature_neg_log : {2, 4}) {
-    for (size_t relative_end_temperature_neg_log : {7, 9}) {
-      for (size_t iterations_per_temperature : {5, 50, 100}) {
-        for (size_t iterations_per_move : {2, 5, 10}) {
-          result.push_back(SetCoverConfiguration{
-              .relative_start_temperature_neg_log =
-                  relative_start_temperature_neg_log,
-              .relative_end_temperature_neg_log =
-                  relative_end_temperature_neg_log,
-              .iterations_per_temperature = iterations_per_temperature,
-              .iterations_per_move = iterations_per_move,
-          });
-        }
-      }
-    }
-  }
-
-  return result;
+  return scores;
 }
 
 int main() {
@@ -102,11 +74,24 @@ int main() {
 
   std::filesystem::create_directories(output_directory);
 
-  GridSearch<SetCoverConfiguration, SetCoverRunResult> search(output_directory);
+  gridsearch::GridSearch<std::vector<size_t>> search(output_directory);
 
-  search.set_strategy(GridSearchStrategy::RANDOM);
+  // SA parameters
+  search.add_parameter("relative_start_temperature_log", {0, -1, -2, -3, -4});
+  search.add_parameter("relative_end_temperature_log", {-5, -6, -7, -8, -9});
+  search.add_parameter("iterations_per_temperature",
+                       {1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 45, 50, 100, 200});
+  search.add_parameter("iterations_per_move", {1, 2, 3, 4, 5, 6, 7, 8, 9, 10});
+  search.add_parameter("taboo_duration_multiplier", {0.1, 0.5, 1, 1.5, 2.});
+
+  // GRASP parameters
+  search.add_parameter("grasp_temperature",
+                       {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.});
+  search.add_parameter("grasp_quality",
+                       {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.});
+
+  search.set_strategy(gridsearch::GridSearchStrategy::RANDOM);
   search.set_runner(runner);
-  search.add_configurations(get_configurations_grid());
 
-  search.run();
+  search.start();
 }
