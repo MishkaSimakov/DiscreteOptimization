@@ -14,10 +14,10 @@ using namespace setcover;
 Solution solve(const Problem& problem) {
   SimulatedAnnealingConfig sa_config{
       .relative_start_temperature = 1e-2,
-      .relative_end_temperature = 1e-9,
+      .relative_end_temperature = 1e-7,
       .alpha = 0.99,
       .iterations_per_temperature = 5,
-      .iterations_per_move = 5,
+      .iterations_per_move = 2,
       .taboo_duration_multiplier = 1,
   };
 
