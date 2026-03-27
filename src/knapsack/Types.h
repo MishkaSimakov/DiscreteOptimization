@@ -9,6 +9,10 @@ namespace knapsack {
 struct Item {
   size_t weight;
   size_t cost;
+
+  double relative_cost() const {
+    return static_cast<double>(cost) / static_cast<double>(weight);
+  }
 };
 
 struct Problem {

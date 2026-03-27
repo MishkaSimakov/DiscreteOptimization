@@ -58,10 +58,7 @@ class GRASP {
   Solution solve(const Problem& problem) {
     std::vector<std::pair<double, size_t>> relative_costs(problem.items.size());
     for (size_t i = 0; i < problem.items.size(); ++i) {
-      auto item = problem.items[i];
-
-      relative_costs.emplace_back(
-          static_cast<double>(item.cost) / static_cast<double>(item.weight), i);
+      relative_costs[i] = {problem.items[i].relative_cost(), i};
     }
 
     std::ranges::sort(relative_costs, {}, [](std::pair<double, size_t> item) {
@@ -89,7 +86,7 @@ class GRASP {
         continue;
       }
 
-      // std::cout << "GRASP: " << solution << std::endl;
+      std::cout << "GRASP: " << solution << std::endl;
       solution = HillClimber(deadline).solve(problem, solution);
 
       auto evaluation = evaluate(problem, solution);

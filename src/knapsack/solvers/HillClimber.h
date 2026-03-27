@@ -47,10 +47,6 @@ class HillClimber {
     }
   }
 
-  static double get_relative_cost(Item item) {
-    return static_cast<double>(item.cost) / static_cast<double>(item.weight);
-  }
-
   std::optional<size_t> remove_random_item(Solution& solution) {
     if (solution.chosen_items.empty()) {
       return std::nullopt;
@@ -97,7 +93,7 @@ class HillClimber {
     // std::endl;
 
     for (size_t i = 0; i < problem.items.size(); ++i) {
-      free_items_.emplace(get_relative_cost(problem.items[i]), i);
+      free_items_.emplace(problem.items[i].relative_cost(), i);
     }
 
     // TODO: do it faster, make us stronger
@@ -118,7 +114,7 @@ class HillClimber {
       if (removed_item) {
         taboo_[*removed_item] = iteration_;
 
-        free_items_.emplace(get_relative_cost(problem.items[*removed_item]),
+        free_items_.emplace(problem.items[*removed_item].relative_cost(),
                             *removed_item);
       }
 
@@ -147,7 +143,7 @@ class HillClimber {
         for (size_t i = prev_size; i < current_solution.chosen_items.size();
              ++i) {
           const size_t item = current_solution.chosen_items[i];
-          free_items_.emplace(get_relative_cost(problem.items[item]), item);
+          free_items_.emplace(problem.items[item].relative_cost(), item);
         }
 
         current_solution.chosen_items.resize(prev_size);
@@ -175,7 +171,7 @@ class HillClimber {
     }
 
     std::println("  delta={}",
-                       current_cost - get_score(problem, initial_solution));
+                 current_cost - get_score(problem, initial_solution));
 
     // std::cout << "after hill climber: " << current_solution
     // << ", score: " << current_cost << std::endl;
