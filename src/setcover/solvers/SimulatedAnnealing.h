@@ -16,7 +16,6 @@ struct SimulatedAnnealingConfig {
   double relative_start_temperature = 1e-2;
   double relative_end_temperature = 1e-9;
   double alpha = 0.99;  // temperature change rate
-  size_t removed_sets_count = 4;
   size_t iterations_per_temperature = 5;
   size_t iterations_per_move = 10;
 
@@ -74,26 +73,13 @@ class SimulatedAnnealing {
     }
   }
 
-  std::vector<size_t> remove_random_sets(const Problem& problem,
-                                         Solution& solution,
-                                         const size_t count) {
-    std::vector<size_t> removed_sets;
+  size_t remove_random_set(Solution& solution) {
+    size_t index = random_index(solution.chosen_sets.size());
+    size_t set_index = solution.chosen_sets[index];
 
-    double probability = static_cast<double>(count) /
-                         static_cast<double>(solution.chosen_sets.size());
+    solution.chosen_sets.erase(solution.chosen_sets.begin() + index);
 
-    std::erase_if(solution.chosen_sets, [&](size_t set) {
-      std::uniform_real_distribution<double> random_accept(0, 1);
-
-      if (random_accept(engine_) < probability) {
-        removed_sets.push_back(set);
-        return true;
-      }
-
-      return false;
-    });
-
-    return removed_sets;
+    return set_index;
   }
 
  public:
@@ -107,11 +93,10 @@ class SimulatedAnnealing {
     // square root of neighborhood size
     const size_t taboo_duration =
         config.taboo_duration_multiplier *
-        std::pow(static_cast<double>(initial_solution.chosen_sets.size()),
-                 static_cast<double>(config.removed_sets_count) / 2);
+        std::sqrt(static_cast<double>(initial_solution.chosen_sets.size()));
 
-    // (move hash, last iteration when it was used)
-    std::unordered_map<size_t, size_t> taboo_list;
+    // (set index, last iteration when it was removed)
+    std::vector<size_t> taboo_list(problem.sets.size(), -1);
     CoveringSetsPack pack(problem);
 
     Solution current_solution = initial_solution;
@@ -130,13 +115,12 @@ class SimulatedAnnealing {
 
     while (temperature > end_temperature) {
       // remove random sets from the solution
-      auto removed = remove_random_sets(problem, current_solution,
-                                        config.removed_sets_count);
+      const size_t removed = remove_random_set(current_solution);
 
-      size_t hash = unordered_vector_hash(removed);
-      auto [itr, inserted] = taboo_list.emplace(hash, iteration);
+      if (taboo_list[removed] == -1 ||
+          taboo_list[removed] + taboo_duration < iteration) {
+        taboo_list[removed] = iteration;
 
-      if (inserted || itr->second + taboo_duration < iteration) {
         // restore solution feasibility
         size_t prev_size = current_solution.chosen_sets.size();
 
@@ -157,7 +141,6 @@ class SimulatedAnnealing {
 
         current_solution = std::move(best_finished);
 
-        itr->second = iteration;
         size_t new_cost = get_score(problem, current_solution);
 
         double delta =
@@ -178,16 +161,11 @@ class SimulatedAnnealing {
         } else {
           // rollback changes
           current_solution.chosen_sets.resize(prev_size);
-
-          for (const size_t set : removed) {
-            current_solution.chosen_sets.push_back(set);
-          }
+          current_solution.chosen_sets.push_back(removed);
         }
       } else {
         // rollback changes
-        for (const size_t set : removed) {
-          current_solution.chosen_sets.push_back(set);
-        }
+        current_solution.chosen_sets.push_back(removed);
       }
 
       if ((iteration + 1) % config.iterations_per_temperature == 0) {

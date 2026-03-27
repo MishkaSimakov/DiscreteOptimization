@@ -20,13 +20,12 @@ const std::vector<std::string> graded_problems = {
 struct SetCoverConfiguration {
   size_t relative_start_temperature_neg_log;
   size_t relative_end_temperature_neg_log;
-  size_t removed_sets_count;
   size_t iterations_per_temperature;
   size_t iterations_per_move;
 
   std::string serialize() const {
-    return std::format("{}_{}_{}_{}_{}", relative_start_temperature_neg_log,
-                       relative_end_temperature_neg_log, removed_sets_count,
+    return std::format("{}_{}_{}_{}", relative_start_temperature_neg_log,
+                       relative_end_temperature_neg_log,
                        iterations_per_temperature, iterations_per_move);
   }
 };
@@ -51,7 +50,6 @@ SetCoverRunResult runner(SetCoverConfiguration config) {
       .relative_end_temperature =
           std::pow(0.1, config.relative_end_temperature_neg_log),
       .alpha = 0.99,
-      .removed_sets_count = config.removed_sets_count,
       .iterations_per_temperature = config.iterations_per_temperature,
       .iterations_per_move = config.iterations_per_move,
       .taboo_duration_multiplier = 1,
@@ -81,19 +79,16 @@ std::vector<SetCoverConfiguration> get_configurations_grid() {
 
   for (size_t relative_start_temperature_neg_log : {2, 4}) {
     for (size_t relative_end_temperature_neg_log : {7, 9}) {
-      for (size_t removed_sets_count : {2, 4, 6}) {
-        for (size_t iterations_per_temperature : {5, 50, 100}) {
-          for (size_t iterations_per_move : {2, 5, 10}) {
-            result.push_back(SetCoverConfiguration{
-                .relative_start_temperature_neg_log =
-                    relative_start_temperature_neg_log,
-                .relative_end_temperature_neg_log =
-                    relative_end_temperature_neg_log,
-                .removed_sets_count = removed_sets_count,
-                .iterations_per_temperature = iterations_per_temperature,
-                .iterations_per_move = iterations_per_move,
-            });
-          }
+      for (size_t iterations_per_temperature : {5, 50, 100}) {
+        for (size_t iterations_per_move : {2, 5, 10}) {
+          result.push_back(SetCoverConfiguration{
+              .relative_start_temperature_neg_log =
+                  relative_start_temperature_neg_log,
+              .relative_end_temperature_neg_log =
+                  relative_end_temperature_neg_log,
+              .iterations_per_temperature = iterations_per_temperature,
+              .iterations_per_move = iterations_per_move,
+          });
         }
       }
     }

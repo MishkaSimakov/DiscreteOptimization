@@ -16,7 +16,6 @@ Solution solve(const Problem& problem) {
       .relative_start_temperature = 1e-2,
       .relative_end_temperature = 1e-9,
       .alpha = 0.99,
-      .removed_sets_count = 1,
       .iterations_per_temperature = 5,
       .iterations_per_move = 5,
       .taboo_duration_multiplier = 1,
