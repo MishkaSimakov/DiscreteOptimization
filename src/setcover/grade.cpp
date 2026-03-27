@@ -12,7 +12,18 @@ using namespace std::chrono_literals;
 using namespace setcover;
 
 Solution solve(const Problem& problem) {
-  return GRASP(0.1, 0.4, timing::Deadline::after(60s)).solve(problem);
+  SimulatedAnnealingConfig sa_config{
+      .relative_start_temperature = 1e-2,
+      .relative_end_temperature = 1e-9,
+      .alpha = 0.99,
+      .removed_sets_count = 1,
+      .iterations_per_temperature = 5,
+      .iterations_per_move = 5,
+      .taboo_duration_multiplier = 1,
+  };
+
+  return GRASP(0.1, 0.4, timing::Deadline::after(60s), sa_config)
+      .solve(problem);
 }
 
 int main(int argc, char** argv) {
