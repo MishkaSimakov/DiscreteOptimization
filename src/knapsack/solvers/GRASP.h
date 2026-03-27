@@ -71,7 +71,18 @@ class GRASP {
 
     size_t iterations_cnt = 0;
 
+    size_t failed_iterations = 0;
+    size_t successful_iterations = 0;
+
     while (true) {
+      if (failed_iterations > successful_iterations && temperature_ < 0.5) {
+        std::println(
+            "temperature = {}, iterations: failed = {}, successful = {}",
+            temperature_, failed_iterations, successful_iterations);
+        temperature_ *= 1.1;
+        failed_iterations = 0;
+      }
+
       ++iterations_cnt;
 
       if (deadline.is_over()) {
@@ -84,11 +95,13 @@ class GRASP {
       auto [_, inserted] = visited_solutions_.emplace(hash);
 
       if (!inserted) {
+        ++failed_iterations;
         continue;
       }
 
-      solution =
-          HillClimber(deadline).solve(problem, solution);
+      ++successful_iterations;
+
+      solution = HillClimber(deadline).solve(problem, solution);
 
       auto evaluation = evaluate(problem, solution);
       assert(evaluation.is_valid);
