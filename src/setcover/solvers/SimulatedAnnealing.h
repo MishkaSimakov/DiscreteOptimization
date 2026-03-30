@@ -27,44 +27,39 @@ class SimulatedAnnealing {
 
   const SimulatedAnnealingConfig config;
 
+  CoveringSetsPack pack_;
+
   // random
   size_t random_counter_{0};
   std::default_random_engine engine_;
 
   size_t random_index(size_t size) { return (++random_counter_ * 41) % size; }
 
-  void finish_solution(const Problem& problem, Solution& solution,
-                       CoveringSetsPack& pack) {
-    pack.reset();
-
-    for (const size_t set_index : solution.chosen_sets) {
-      pack.include_set(set_index);
-    }
-
+  void finish_solution(const Problem& problem, Solution& solution) {
     for (size_t i = 0; i < problem.elements_count; ++i) {
-      if (pack.is_covered(i)) {
+      if (pack_.is_covered(i)) {
         continue;
       }
 
-      auto sets = pack.get_sets_covering(i);
+      auto sets = pack_.get_sets_covering(i);
 
       // set with small relative cost is more likely
       double sum = 0;
       for (const size_t set : sets) {
-        if (pack.get_set_state(set) == SetState::DEFAULT) {
-          sum += 1. / pack.get_relative_cost(set);
+        if (pack_.get_set_state(set) == SetState::DEFAULT) {
+          sum += 1. / pack_.get_relative_cost(set);
         }
       }
 
       double value = std::uniform_real_distribution<>(0, sum)(engine_);
 
       for (const size_t set : sets) {
-        if (pack.get_set_state(set) == SetState::DEFAULT) {
-          value -= 1. / pack.get_relative_cost(set);
+        if (pack_.get_set_state(set) == SetState::DEFAULT) {
+          value -= 1. / pack_.get_relative_cost(set);
 
           if (value <= 0) {
             solution.chosen_sets.push_back(set);
-            pack.include_set(set);
+            pack_.include_set(set);
 
             break;
           }
@@ -78,14 +73,16 @@ class SimulatedAnnealing {
     size_t set_index = solution.chosen_sets[index];
 
     solution.chosen_sets.erase(solution.chosen_sets.begin() + index);
+    pack_.default_set(set_index);
 
     return set_index;
   }
 
  public:
   explicit SimulatedAnnealing(timing::Deadline deadline,
-                              SimulatedAnnealingConfig config)
-      : deadline(deadline), config(config) {}
+                              SimulatedAnnealingConfig config,
+                              const Problem& problem)
+      : deadline(deadline), config(config), pack_(problem) {}
 
   Solution solve(const Problem& problem, const Solution& initial_solution) {
     std::uniform_real_distribution<double> random_accept(0, 1);
@@ -97,7 +94,6 @@ class SimulatedAnnealing {
 
     // (set index, last iteration when it was removed)
     std::vector<size_t> taboo_list(problem.sets.size(), -1);
-    CoveringSetsPack pack(problem);
 
     Solution current_solution = initial_solution;
     size_t current_cost = get_score(problem, current_solution);
@@ -113,6 +109,11 @@ class SimulatedAnnealing {
 
     // std::print("  {} -> ", current_cost);
 
+    pack_.reset();
+    for (const size_t set : current_solution.chosen_sets) {
+      pack_.include_set(set);
+    }
+
     while (temperature > end_temperature) {
       // remove random sets from the solution
       const size_t removed = remove_random_set(current_solution);
@@ -122,24 +123,8 @@ class SimulatedAnnealing {
         taboo_list[removed] = iteration;
 
         // restore solution feasibility
-        size_t prev_size = current_solution.chosen_sets.size();
-
-        Solution best_finished;
-        size_t best_finished_cost = 1e10;  // infinity
-
-        for (size_t i = 0; i < config.iterations_per_move; ++i) {
-          finish_solution(problem, current_solution, pack);
-
-          size_t cost = get_score(problem, current_solution);
-          if (cost < best_finished_cost) {
-            best_finished = current_solution;
-            best_finished_cost = cost;
-          }
-
-          current_solution.chosen_sets.resize(prev_size);
-        }
-
-        current_solution = std::move(best_finished);
+        const size_t prev_size = current_solution.chosen_sets.size();
+        finish_solution(problem, current_solution);
 
         size_t new_cost = get_score(problem, current_solution);
 
@@ -160,11 +145,18 @@ class SimulatedAnnealing {
           }
         } else {
           // rollback changes
+          for (size_t j = prev_size; j < current_solution.chosen_sets.size();
+               ++j) {
+            pack_.default_set(current_solution.chosen_sets[j]);
+          }
           current_solution.chosen_sets.resize(prev_size);
+
+          pack_.include_set(removed);
           current_solution.chosen_sets.push_back(removed);
         }
       } else {
         // rollback changes
+        pack_.include_set(removed);
         current_solution.chosen_sets.push_back(removed);
       }
 

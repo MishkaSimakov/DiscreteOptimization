@@ -22,8 +22,7 @@ class CoveringSetsPack {
   std::vector<size_t> begins_;
 
   // count of sets covering given element
-  // std::vector<size_t> covering_sets_count_;
-  std::vector<bool> mask_;
+  std::vector<size_t> covering_sets_count_;
 
   // current size of each set (excluding already covered elements)
   std::vector<size_t> current_sizes_;
@@ -35,7 +34,7 @@ class CoveringSetsPack {
   explicit CoveringSetsPack(const Problem& problem)
       : problem_(problem),
         begins_(problem.elements_count + 1),
-        mask_(problem.elements_count, true),
+        covering_sets_count_(problem.elements_count, 0),
         current_sizes_(problem.sets.size()),
         states_(problem.sets.size(), SetState::DEFAULT) {
     for (size_t i = 0; i < problem.elements_count; ++i) {
@@ -55,23 +54,41 @@ class CoveringSetsPack {
     }
   }
 
+  void default_set(size_t set_index) {
+    assert(states_[set_index] == SetState::INCLUDED);
+
+    states_[set_index] = SetState::DEFAULT;
+
+    for (const size_t element : problem_.sets[set_index].elements) {
+      --covering_sets_count_[element];
+
+      if (covering_sets_count_[element] == 0) {
+        for (const size_t set : get_sets_covering(element)) {
+          ++current_sizes_[set];
+        }
+      }
+    }
+  }
+
   void include_set(size_t set_index) {
     assert(states_[set_index] == SetState::DEFAULT);
 
     states_[set_index] = SetState::INCLUDED;
 
     for (const size_t element : problem_.sets[set_index].elements) {
-      if (mask_[element]) {
-        mask_[element] = false;
-
+      if (covering_sets_count_[element] == 0) {
         for (const size_t set : get_sets_covering(element)) {
           --current_sizes_[set];
         }
       }
+
+      ++covering_sets_count_[element];
     }
   }
 
-  bool is_covered(size_t element) const { return !mask_[element]; }
+  bool is_covered(size_t element) const {
+    return covering_sets_count_[element] != 0;
+  }
 
   SetState get_set_state(size_t set) const { return states_[set]; }
 
@@ -86,7 +103,7 @@ class CoveringSetsPack {
   }
 
   std::optional<double> get_min_covering_cost(size_t element) {
-    if (!mask_[element]) {
+    if (covering_sets_count_[element] != 0) {
       // элемент уже покрыт
       return 0;
     }
@@ -149,7 +166,7 @@ class CoveringSetsPack {
   }
 
   void reset() {
-    std::ranges::fill(mask_, true);
+    std::ranges::fill(covering_sets_count_, 0);
     std::ranges::fill(states_, SetState::DEFAULT);
 
     for (size_t i = 0; i < problem_.sets.size(); ++i) {

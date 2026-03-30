@@ -12,17 +12,16 @@ using namespace std::chrono_literals;
 using namespace setcover;
 
 Solution solve(const Problem& problem) {
-  SimulatedAnnealingConfig sa_config{
+  SimulatedAnnealingConfig config{
       .relative_start_temperature = 1e-2,
       .relative_end_temperature = 1e-7,
       .alpha = 0.99,
-      .iterations_per_temperature = 5,
-      .iterations_per_move = 2,
+      .iterations_per_temperature = 25,
+      .iterations_per_move = 1,
       .taboo_duration_multiplier = 1,
   };
 
-  return GRASP(0.1, 0.4, timing::Deadline::after(60s), sa_config)
-      .solve(problem);
+  return GRASP(0.1, 0.5, timing::Deadline::after(60s), config).solve(problem);
 }
 
 int main(int argc, char** argv) {

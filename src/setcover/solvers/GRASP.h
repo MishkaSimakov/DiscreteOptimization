@@ -113,6 +113,8 @@ class GRASP {
     size_t failed_iterations = 0;
     size_t successful_iterations = 0;
 
+    SimulatedAnnealing sa(deadline, simulated_annealing_config, problem);
+
     while (true) {
       if (failed_iterations > successful_iterations && temperature_ < 0.5) {
         std::println(
@@ -124,32 +126,22 @@ class GRASP {
 
       auto result = iteration(problem, pack, best_score);
 
-      size_t hash = unordered_vector_hash(result.first.chosen_sets);
+      const size_t hash = unordered_vector_hash(result.first.chosen_sets);
       auto [_, inserted] = visited.emplace(hash);
 
       if (inserted) {
         // improve solution using Simulated Annealing
-        auto sa_improved =
-            SimulatedAnnealing(deadline, simulated_annealing_config)
-                .solve(problem, result.first);
-        size_t score_after_sa = get_score(problem, sa_improved);
+        auto sa_improved = sa.solve(problem, result.first);
+        const size_t new_score = get_score(problem, sa_improved);
 
-        auto hc_improved = HillClimber2(deadline).solve(problem, sa_improved);
-        size_t cost = get_score(problem, hc_improved);
-
-        // if (score_after_sa != cost) {
-          // std::println("  {} -> {}", get_score(problem, result.first), cost);
-        // }
-
-        if (cost < best_score) {
-          std::println("  {}", cost);
-          best_score = cost;
-          best_solution = std::move(hc_improved);
+        if (new_score < best_score) {
+          std::println("  {}", new_score);
+          best_score = new_score;
+          best_solution = std::move(sa_improved);
         }
 
         ++successful_iterations;
       } else {
-        // std::println("skip");
         ++failed_iterations;
       }
 
