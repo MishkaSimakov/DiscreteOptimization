@@ -11,8 +11,12 @@
 using namespace std::chrono_literals;
 
 const std::vector<std::string> graded_problems = {
-    "sc_157_0",  "sc_330_0",   "sc_1000_11",
-    "sc_5000_1", "sc_10000_5", "sc_10000_2",
+    // "sc_157_0",
+    // "sc_330_0",
+    // "sc_1000_11",
+    // "sc_5000_1",
+  "sc_10000_5",
+  // "sc_10000_2",
 };
 
 void solve(const std::string& problem_name) {
@@ -33,16 +37,16 @@ void solve(const std::string& problem_name) {
   // };
 
   setcover::SimulatedAnnealingConfig sa_config{
-      .relative_start_temperature = 1,
+      .relative_start_temperature = 1e-3,
       .relative_end_temperature = 1e-5,
       .alpha = 0.99,
       .iterations_per_temperature = 1,
       .iterations_per_move = 1,
-      .taboo_duration_multiplier = 0.1,
+      .taboo_duration_multiplier = 1,
   };
 
   auto grasp_solution =
-      setcover::GRASP(0.1, 0.4, timing::Deadline::after(1s), sa_config)
+      setcover::GRASP(0.5, 0.5, timing::Deadline::after(60s), sa_config)
           .solve(problem);
   auto grasp_evaluation = setcover::evaluate(problem, grasp_solution);
 

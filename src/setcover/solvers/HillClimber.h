@@ -80,7 +80,7 @@ class HillClimber {
         current_solution = std::move(new_solution);
         current_cost = cost;
 
-        std::println("  {} -> {}", current_cost, cost);
+        // std::println("  {} -> {}", current_cost, cost);
       }
 
       if (deadline.is_over()) {

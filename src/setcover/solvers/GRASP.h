@@ -3,7 +3,7 @@
 #include <optional>
 #include <random>
 
-#include "HillClimber.h"
+#include "HillClimber2.h"
 #include "SimulatedAnnealing.h"
 #include "setcover/CoveringSetsPack.h"
 #include "setcover/Types.h"
@@ -15,7 +15,7 @@ class GRASP {
 
   // Температура 1 - всегда выбираем случайное (не слишком плохое) множество.
   // Температура 0 - жадный алгоритм.
-  const double temperature;
+  double temperature_;
 
   // Порог на выбор случайного множества. Пусть множество, которое выбрал бы
   // жадный алгоритм имеет относительную стоимость l. Тогда случайное множество
@@ -79,7 +79,7 @@ class GRASP {
       }
 
       size_t chosen_set = greedy_set->first;
-      if (coin(engine_) < temperature) {
+      if (coin(engine_) < temperature_) {
         auto suitable_sets =
             pack.get_default_sets(greedy_set->second * quality_threshold);
 
@@ -98,7 +98,7 @@ class GRASP {
  public:
   explicit GRASP(double temperature, double quality_threshold,
                  timing::Deadline deadline, SimulatedAnnealingConfig config)
-      : temperature(temperature),
+      : temperature_(temperature),
         quality_threshold(quality_threshold),
         simulated_annealing_config(config),
         deadline(deadline) {}
@@ -108,21 +108,49 @@ class GRASP {
     Solution best_solution;
     size_t best_score = 1e10;  // infinity
 
-    size_t iterations_cnt = 0;
+    std::unordered_set<size_t> visited;
+
+    size_t failed_iterations = 0;
+    size_t successful_iterations = 0;
 
     while (true) {
-      ++iterations_cnt;
+      if (failed_iterations > successful_iterations && temperature_ < 0.5) {
+        std::println(
+            "temperature = {}, iterations: failed = {}, successful = {}",
+            temperature_, failed_iterations, successful_iterations);
+        temperature_ *= 1.1;
+        failed_iterations = 0;
+      }
 
       auto result = iteration(problem, pack, best_score);
 
-      // improve solution using Simulated Annealing
-      auto improved = SimulatedAnnealing(deadline, simulated_annealing_config)
-                          .solve(problem, result.first);
-      size_t cost = get_score(problem, improved);
+      size_t hash = unordered_vector_hash(result.first.chosen_sets);
+      auto [_, inserted] = visited.emplace(hash);
 
-      if (cost < best_score) {
-        best_score = cost;
-        best_solution = std::move(improved);
+      if (inserted) {
+        // improve solution using Simulated Annealing
+        auto sa_improved =
+            SimulatedAnnealing(deadline, simulated_annealing_config)
+                .solve(problem, result.first);
+        size_t score_after_sa = get_score(problem, sa_improved);
+
+        auto hc_improved = HillClimber2(deadline).solve(problem, sa_improved);
+        size_t cost = get_score(problem, hc_improved);
+
+        // if (score_after_sa != cost) {
+          // std::println("  {} -> {}", get_score(problem, result.first), cost);
+        // }
+
+        if (cost < best_score) {
+          std::println("  {}", cost);
+          best_score = cost;
+          best_solution = std::move(hc_improved);
+        }
+
+        ++successful_iterations;
+      } else {
+        // std::println("skip");
+        ++failed_iterations;
       }
 
       if (deadline.is_over()) {
@@ -130,7 +158,8 @@ class GRASP {
       }
     }
 
-    // std::println("grasp iterations: {}", iterations_cnt);
+    std::println("iterations: successful = {}, failed = {}",
+                 successful_iterations, failed_iterations);
 
     return best_solution;
   }

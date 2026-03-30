@@ -21,7 +21,8 @@ class CoveringSetsPack {
   std::vector<size_t> sets_;
   std::vector<size_t> begins_;
 
-  // uncovered elements mask
+  // count of sets covering given element
+  // std::vector<size_t> covering_sets_count_;
   std::vector<bool> mask_;
 
   // current size of each set (excluding already covered elements)
@@ -52,12 +53,6 @@ class CoveringSetsPack {
     for (size_t i = 0; i < problem.sets.size(); ++i) {
       current_sizes_[i] = problem.sets[i].elements.size();
     }
-  }
-
-  void exclude_set(size_t set_index) {
-    assert(states_[set_index] == SetState::DEFAULT);
-
-    states_[set_index] = SetState::EXCLUDED;
   }
 
   void include_set(size_t set_index) {
