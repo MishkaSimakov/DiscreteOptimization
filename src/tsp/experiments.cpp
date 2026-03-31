@@ -3,6 +3,8 @@
 #include "Output.h"
 #include "helpers/Files.h"
 #include "helpers/Time.h"
+#include "solvers/Greedy.h"
+// #include "solvers/KernighanLin.h"
 #include "tsp/Evaluator.h"
 #include "tsp/Reader.h"
 
@@ -19,6 +21,15 @@ void solve(const std::string& problem_name) {
 
   std::println("solving {}, #points = {}", path.filename().string(),
                problem.points.size());
+
+  auto solution = tsp::Greedy(problem).solve();
+  auto evaluation = tsp::evaluate(problem, solution);
+
+  if (!evaluation.is_valid) {
+    throw std::runtime_error("Invalid solution");
+  }
+
+  std::println("  score: {}", evaluation.score);
 }
 
 int main() {

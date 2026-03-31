@@ -21,11 +21,12 @@ class Output {
       throw std::runtime_error("Failed to open output file.");
     }
 
-    std::println(os, "{}",
-                 str::join(solution.order | std::views::transform([](size_t i) {
-                             return std::to_string(i);
-                           }),
-                           " "));
+    size_t current = 0;
+    for (size_t i = 0; i < solution.next.size(); ++i) {
+      std::print(os, "{} ", current);
+
+      current = solution.next[current];
+    }
   }
 
   void store_statistics(const std::string& problem_name,

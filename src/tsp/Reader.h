@@ -21,7 +21,12 @@ Problem read_problem(const std::filesystem::path& path) {
   std::vector<Point> points(points_count);
 
   for (size_t i = 0; i < points_count; ++i) {
-    is >> points[i].x >> points[i].y;
+    double x;
+    double y;
+    is >> x >> y;
+
+    points[i].x = static_cast<size_t>(x);
+    points[i].y = static_cast<size_t>(y);
   }
 
   return Problem{

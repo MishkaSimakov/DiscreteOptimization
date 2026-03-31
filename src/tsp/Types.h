@@ -22,12 +22,14 @@ struct Problem {
 };
 
 struct Solution {
-  std::vector<size_t> order;
+  std::vector<size_t> next;
 };
 
 struct EvaluationResult {
   double score;
   bool is_valid;
+
+  static EvaluationResult invalid() { return {.score = 0, .is_valid = false}; }
 };
 
 struct Statistics : EvaluationResult {

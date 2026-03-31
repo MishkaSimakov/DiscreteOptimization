@@ -3,15 +3,14 @@
 #include "Output.h"
 #include "helpers/Files.h"
 #include "helpers/Time.h"
+#include "solvers/Greedy.h"
 #include "tsp/Evaluator.h"
 #include "tsp/Reader.h"
 
 using namespace std::chrono_literals;
 using namespace tsp;
 
-Solution solve(const Problem& problem) {
-  throw std::runtime_error("Not implemented");
-}
+Solution solve(const Problem& problem) { return Greedy(problem).solve(); }
 
 int main(int argc, char** argv) {
   if (argc != 2) {
