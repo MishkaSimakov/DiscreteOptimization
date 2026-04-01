@@ -4,7 +4,7 @@
 #include "helpers/Files.h"
 #include "helpers/Time.h"
 #include "solvers/Greedy.h"
-// #include "solvers/KernighanLin.h"
+#include "solvers/LocalSearch2opt.h"
 #include "tsp/Evaluator.h"
 #include "tsp/Reader.h"
 
@@ -29,7 +29,15 @@ void solve(const std::string& problem_name) {
     throw std::runtime_error("Invalid solution");
   }
 
-  std::println("  score: {}", evaluation.score);
+  auto improved_solution = tsp::LocalSearch2opt(problem).solve(solution);
+  auto improved_evaluation = tsp::evaluate(problem, improved_solution);
+
+  if (!improved_evaluation.is_valid) {
+    throw std::runtime_error("Invalid solution");
+  }
+
+  std::println("  score: {}, score after LocalDescent: {}", evaluation.score,
+               improved_evaluation.score);
 }
 
 int main() {

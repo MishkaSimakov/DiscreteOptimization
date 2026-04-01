@@ -1,6 +1,8 @@
-function(add_target target_name source_path)
-    add_executable(${target_name} ${source_path})
-    target_include_directories(${target_name} PUBLIC .)
+function(add_target target_name sources)
+    add_executable(${target_name})
+
+    target_sources(${target_name} PUBLIC ${sources})
+    target_include_directories(${target_name} PUBLIC ${CMAKE_SOURCE_DIR}/src)
     target_link_libraries(${target_name} raspisator nlohmann_json::nlohmann_json)
 
     target_compile_definitions(
