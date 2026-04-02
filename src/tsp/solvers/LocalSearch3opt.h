@@ -98,7 +98,6 @@ class LocalSearch3opt {
 
           // choose t6
 
-
           if (gain > tolerance) {
             // std::println("  2-opt: {}, {}, {}, {}; gain = {}", t1, t2, t3,
             // t4, gain);

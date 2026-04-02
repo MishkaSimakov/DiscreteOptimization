@@ -14,6 +14,7 @@ class LocalSearch2opt {
   constexpr static double tolerance = 1e-10;
 
   const Problem& problem;
+  const std::vector<std::vector<size_t>> candidates;
 
   // Takes closest max_count points.
   static auto get_candidates_by_distance(const Problem& problem,
@@ -53,8 +54,7 @@ class LocalSearch2opt {
     return distance(problem.points[i], problem.points[j]);
   }
 
-  bool try_improve(TourStorage& tour,
-                   const std::vector<std::vector<size_t>>& candidates) {
+  bool try_improve(TourStorage& tour) {
     const size_t n = problem.points.size();
 
     for (size_t t1 = 0; t1 < n; ++t1) {
@@ -72,8 +72,8 @@ class LocalSearch2opt {
                               get_distance(t1, t4) - get_distance(t2, t3);
 
           if (gain > tolerance) {
-            std::println("  2-opt: {}, {}, {}, {}; gain = {}", t1, t2, t3, t4,
-                         gain);
+            // std::println("  2-opt: {}, {}, {}, {}; gain = {}", t1, t2, t3, t4,
+                         // gain);
 
             tour.apply_2opt(t1, t2, t3);
 
@@ -87,23 +87,19 @@ class LocalSearch2opt {
   }
 
  public:
-  explicit LocalSearch2opt(const Problem& problem) : problem(problem) {}
+  explicit LocalSearch2opt(const Problem& problem)
+      : problem(problem), candidates(get_candidates_by_distance(problem, 5)) {}
 
   Solution solve(const Solution& initial_solution) {
     TourStorage tour(initial_solution);
-    auto candidates = get_candidates_by_distance(problem, 5);
-
-    std::println("  score: {}", get_score(problem, tour.to_solution()));
 
     while (true) {
       assert(tour.is_valid());
-      bool improved = try_improve(tour, candidates);
+      bool improved = try_improve(tour);
 
       if (!improved) {
         break;
       }
-
-      std::println("  score: {}", get_score(problem, tour.to_solution()));
     }
 
     return tour.to_solution();

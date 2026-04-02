@@ -14,4 +14,13 @@ size_t index(size_t size, Gen&& generator) {
   return std::uniform_int_distribution<size_t>(0, size - 1)(generator);
 }
 
+// Returns true with given probability
+template <typename Gen>
+  requires std::uniform_random_bit_generator<std::remove_reference_t<Gen>>
+bool bernoulli(double probability, Gen&& generator) {
+  assert(0 <= probability <= 1);
+
+  return std::bernoulli_distribution(probability)(generator);
+}
+
 }  // namespace rnd

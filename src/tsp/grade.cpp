@@ -3,6 +3,7 @@
 #include "Output.h"
 #include "helpers/Files.h"
 #include "helpers/Time.h"
+#include "solvers/Genetics.h"
 #include "solvers/Greedy.h"
 #include "solvers/LocalSearch2opt.h"
 #include "tsp/Evaluator.h"
@@ -12,11 +13,12 @@ using namespace std::chrono_literals;
 using namespace tsp;
 
 Solution solve(const Problem& problem) {
-  auto solution = Greedy(problem).solve();
+  GeneticsParams params{
+      .population_size = 50,
+      .mutation_rate = 0.2,
+  };
 
-  auto improved_solution = LocalSearch2opt(problem).solve(solution);
-
-  return improved_solution;
+  return Genetics(timing::Deadline::after(60s), problem, params).solve();
 }
 
 int main(int argc, char** argv) {
