@@ -4,6 +4,7 @@
 #include <numeric>
 #include <vector>
 
+#include "Candidates.h"
 #include "TourStorage.h"
 #include "tsp/Evaluator.h"
 #include "tsp/Types.h"
@@ -19,44 +20,6 @@ class LocalSearch3opt {
   constexpr static double tolerance = 1e-10;
 
   const Problem& problem;
-
-  // Takes closest max_count points.
-  static auto get_candidates_by_distance(const Problem& problem,
-                                         const size_t max_count) {
-    const size_t n = problem.points.size();
-    std::vector<std::vector<size_t>> result(n);
-
-    std::vector<size_t> heap;
-
-    for (size_t i = 0; i < n; ++i) {
-      auto proj = [i, &problem](size_t j) {
-        return distance(problem.points[i], problem.points[j]);
-      };
-
-      for (size_t j = 0; j < n; ++j) {
-        if (j == i) {
-          continue;
-        }
-
-        heap.push_back(j);
-        std::ranges::push_heap(heap, {}, proj);
-
-        if (heap.size() > max_count) {
-          std::ranges::pop_heap(heap, {}, proj);
-          heap.pop_back();
-        }
-      }
-
-      result[i] = heap;
-      heap.clear();
-    }
-
-    return result;
-  }
-
-  double get_distance(size_t i, size_t j) const {
-    return distance(problem.points[i], problem.points[j]);
-  }
 
   bool try_improve(TourStorage& tour,
                    const std::vector<std::vector<size_t>>& candidates) {
@@ -74,8 +37,9 @@ class LocalSearch3opt {
           const size_t t4 = direction == 0 ? tour.pred(t3) : tour.succ(t3);
           assert(all_different({t1, t2, t3, t4}));
 
-          double gain = get_distance(t1, t2) + get_distance(t3, t4) -
-                        get_distance(t1, t4) - get_distance(t2, t3);
+          double gain =
+              problem.get_distance(t1, t2) + problem.get_distance(t3, t4) -
+              problem.get_distance(t1, t4) - problem.get_distance(t2, t3);
 
           if (gain < 0) {
             continue;

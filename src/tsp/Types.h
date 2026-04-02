@@ -19,6 +19,10 @@ inline double distance(Point x, Point y) {
 
 struct Problem {
   std::vector<Point> points;
+
+  double get_distance(size_t i, size_t j) const {
+    return distance(points[i], points[j]);
+  }
 };
 
 struct Solution {

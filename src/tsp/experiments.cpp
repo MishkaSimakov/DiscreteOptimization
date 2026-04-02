@@ -13,8 +13,9 @@ using namespace std::chrono_literals;
 
 const std::vector<std::string> graded_problems = {
     // "tsp_51_1",  "tsp_100_3",  "tsp_200_2",
-    "tsp_574_1",
-    // "tsp_1889_1", "tsp_33810_1",
+    // "tsp_574_1",
+    // "tsp_1889_1",
+    // "tsp_33810_1",
 };
 
 void solve(const std::string& problem_name) {

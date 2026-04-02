@@ -24,6 +24,8 @@ class Genetics {
 
   const GeneticsParams params;
 
+  const std::vector<std::vector<size_t>> candidates;
+
   LocalSearch2opt improver_;
   std::default_random_engine random_;
 
@@ -38,6 +40,23 @@ class Genetics {
       // choose closest to the current
       ArgMinimum<double> closest;
 
+      // first go through candidates
+      for (const size_t j : candidates[current]) {
+        if (j == current || next[j] != -1) {
+          continue;
+        }
+
+        closest.record(j, distance(problem.points[current], problem.points[j]));
+      }
+
+      if (closest.argmin()) {
+        next[current] = *closest.argmin();
+        current = next[current];
+
+        continue;
+      }
+
+      // if failed to find node among candidates, perform full search
       for (size_t j = 0; j < n; ++j) {
         if (j == current || next[j] != -1) {
           continue;
@@ -46,6 +65,7 @@ class Genetics {
         closest.record(j, distance(problem.points[current], problem.points[j]));
       }
 
+      assert(closest.argmin().has_value());
       next[current] = *closest.argmin();
       current = next[current];
     }
@@ -247,10 +267,13 @@ class Genetics {
       : deadline(deadline),
         problem(problem),
         params(params),
-        improver_(problem) {}
+        candidates(get_candidates_by_distance(problem, 5)),
+        improver_(problem, candidates) {}
 
   Solution solve() {
     std::vector<std::pair<double, Solution>> population;
+
+    // auto start = std::chrono::steady_clock::now();
 
     for (size_t i = 0; i < params.population_size; ++i) {
       auto individual = get_initial_individual();
@@ -259,6 +282,11 @@ class Genetics {
       double score = get_score(problem, improved);
 
       population.emplace_back(score, std::move(improved));
+
+      // std::println("  average: {}",
+                   // static_cast<double>(
+                       // (std::chrono::steady_clock::now() - start).count()) /
+                       // (i + 1));
     }
 
     while (!deadline.is_over()) {
@@ -305,3 +333,5 @@ class Genetics {
 };
 
 }  // namespace tsp
+
+// 2839022628

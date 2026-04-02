@@ -19,9 +19,26 @@ class TourStorage {
   std::vector<Node> nodes_;
   std::vector<std::pair<size_t, size_t>> history_;
 
+  // Returns number of nodes on the arc from a to b (a and b included).
+  size_t get_arc_length(size_t a, size_t b) const {
+    const size_t n = nodes_.size();
+    const size_t a_rank = nodes_[a].rank;
+    const size_t b_rank = nodes_[b].rank;
+
+    if (b_rank >= a_rank) {
+      return b_rank - a_rank + 1;
+    }
+
+    return n + b_rank - a_rank + 1;
+  }
+
   // (a, succ(a)), (b, succ(b)) are replaced with (a, b), (succ(a), succ(b))
   void apply_2opt_impl(size_t a, size_t b) {
-    history_.emplace_back(a, b);
+    if (get_arc_length(b, a) < get_arc_length(a, b)) {
+      std::swap(a, b);
+    }
+
+    // history_.emplace_back(a, b);
 
     const size_t n = nodes_.size();
 
@@ -33,6 +50,7 @@ class TourStorage {
     size_t rank = nodes_[t2].rank;
     size_t current = t4;
 
+    // reverse arc from a to b
     do {
       const size_t next = nodes_[current].prev;
 

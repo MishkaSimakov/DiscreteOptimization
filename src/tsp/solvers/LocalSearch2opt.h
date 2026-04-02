@@ -4,6 +4,7 @@
 #include <numeric>
 #include <vector>
 
+#include "Candidates.h"
 #include "TourStorage.h"
 #include "tsp/Evaluator.h"
 #include "tsp/Types.h"
@@ -16,48 +17,16 @@ class LocalSearch2opt {
   const Problem& problem;
   const std::vector<std::vector<size_t>> candidates;
 
-  // Takes closest max_count points.
-  static auto get_candidates_by_distance(const Problem& problem,
-                                         const size_t max_count) {
-    const size_t n = problem.points.size();
-    std::vector<std::vector<size_t>> result(n);
-
-    std::vector<size_t> heap;
-
-    for (size_t i = 0; i < n; ++i) {
-      auto proj = [i, &problem](size_t j) {
-        return distance(problem.points[i], problem.points[j]);
-      };
-
-      for (size_t j = 0; j < n; ++j) {
-        if (j == i) {
-          continue;
-        }
-
-        heap.push_back(j);
-        std::ranges::push_heap(heap, {}, proj);
-
-        if (heap.size() > max_count) {
-          std::ranges::pop_heap(heap, {}, proj);
-          heap.pop_back();
-        }
-      }
-
-      result[i] = heap;
-      heap.clear();
-    }
-
-    return result;
-  }
-
-  double get_distance(size_t i, size_t j) const {
-    return distance(problem.points[i], problem.points[j]);
-  }
+  // try_improve starts where it stopped in the previous iteration
+  // this leads to HUGE time savings!
+  size_t improvement_position{0};
 
   bool try_improve(TourStorage& tour) {
     const size_t n = problem.points.size();
 
-    for (size_t t1 = 0; t1 < n; ++t1) {
+    for (size_t i = 0; i < n; ++i) {
+      const size_t t1 = improvement_position;
+
       for (const size_t direction : {0, 1}) {
         const size_t t2 = direction == 0 ? tour.succ(t1) : tour.pred(t1);
 
@@ -68,12 +37,13 @@ class LocalSearch2opt {
 
           const size_t t4 = tour.get_2opt_node(t1, t2, t3);
 
-          const double gain = get_distance(t1, t2) + get_distance(t3, t4) -
-                              get_distance(t1, t4) - get_distance(t2, t3);
+          const double gain =
+              problem.get_distance(t1, t2) + problem.get_distance(t3, t4) -
+              problem.get_distance(t1, t4) - problem.get_distance(t2, t3);
 
           if (gain > tolerance) {
-            // std::println("  2-opt: {}, {}, {}, {}; gain = {}", t1, t2, t3, t4,
-                         // gain);
+            // std::println("  2-opt: {}, {}, {}, {}; gain = {}", t1, t2, t3,
+            // t4, gain);
 
             tour.apply_2opt(t1, t2, t3);
 
@@ -81,14 +51,22 @@ class LocalSearch2opt {
           }
         }
       }
+
+      improvement_position = (improvement_position + 1) % n;
     }
 
     return false;
   }
 
  public:
+  LocalSearch2opt(const Problem& problem,
+                  std::vector<std::vector<size_t>> candidates)
+      : problem(problem), candidates(std::move(candidates)) {
+    assert(candidates.size() == problem.points.size());
+  }
+
   explicit LocalSearch2opt(const Problem& problem)
-      : problem(problem), candidates(get_candidates_by_distance(problem, 5)) {}
+      : LocalSearch2opt(problem, get_candidates_by_distance(problem, 5)) {}
 
   Solution solve(const Solution& initial_solution) {
     TourStorage tour(initial_solution);
