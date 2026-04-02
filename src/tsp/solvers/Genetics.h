@@ -7,12 +7,15 @@
 #include "helpers/Time.h"
 #include "tsp/Types.h"
 #include "utils/Accumulators.h"
+#include "utils/Logging.h"
 
 namespace tsp {
 
 struct GeneticsParams {
   size_t population_size;
   double mutation_rate;
+
+  bool log;
 };
 
 class Genetics {
@@ -50,6 +53,25 @@ class Genetics {
     next[current] = start;
 
     return Solution{next};
+  }
+
+  static void reverse(std::vector<size_t>& next, const size_t from,
+                      const size_t to) {
+    if (from == to) {
+      return;
+    }
+
+    size_t current = next[from];
+    size_t prev = from;
+
+    do {
+      const size_t next_node = next[current];
+
+      next[current] = prev;
+
+      prev = current;
+      current = next_node;
+    } while (prev != to);
   }
 
   Solution crossover(const Solution& left, const Solution& right) const {
@@ -108,10 +130,7 @@ class Genetics {
       } else {
         // hard case: fragment end -> end
         // should reverse fragment
-        for (size_t j = fragments[next - 1]; j != fragments[next];
-             j = left.next[j]) {
-          child[left.next[j]] = j;
-        }
+        reverse(child, fragments[next - 1], fragments[next]);
 
         std::swap(fragments[next], fragments[next - 1]);
         --next;
@@ -131,10 +150,95 @@ class Genetics {
   }
 
   Solution mutation(Solution solution) {
+    const size_t n = problem.points.size();
+
     // non-sequential 4-change
+    // choose 4 random edges (edges are selected by their vertices)
+    // rnd::unique_indices returns them sorted in descending order
+    auto ranks = rnd::unique_indices(n, 4, random_);
+
+    std::vector<size_t> vertices(4);
+
+    size_t current = 0;
+    size_t found_cnt = 0;
+
+    for (size_t rank = 0; rank < n; ++rank) {
+      if (rank == ranks[3 - found_cnt]) {
+        vertices[found_cnt] = current;
+        ++found_cnt;
+
+        if (found_cnt == 4) {
+          break;
+        }
+      }
+
+      current = solution.next[current];
+    }
+
+    const size_t a0 = vertices[0];
+    const size_t a1 = vertices[1];
+    const size_t a2 = vertices[2];
+    const size_t a3 = vertices[3];
+
+    const size_t b0 = solution.next[a0];
+    const size_t b1 = solution.next[a1];
+    const size_t b2 = solution.next[a2];
+    const size_t b3 = solution.next[a3];
+
+    reverse(solution.next, b1, a2);
+    reverse(solution.next, b2, a3);
+
+    solution.next[a1] = b3;
+    solution.next[a0] = a2;
+    solution.next[b1] = a3;
+    solution.next[b2] = b0;
+
+    assert(evaluate(problem, solution).is_valid);
+
     // improver
+    solution = improver_.solve(solution);
 
     return solution;
+  }
+
+  static double get_diversity(
+      const std::vector<std::pair<double, Solution>>& population) {
+    size_t sum = 0;
+    size_t count = 0;
+
+    for (size_t i = 0; i < population.size(); ++i) {
+      for (size_t j = i + 1; j < population.size(); ++j) {
+        sum += distance(population[i].second, population[j].second);
+        ++count;
+      }
+    }
+
+    return static_cast<double>(sum) / static_cast<double>(count);
+  }
+
+  static double get_fitness(
+      const std::vector<std::pair<double, Solution>>& population) {
+    double sum = 0;
+
+    for (const double score : population | std::views::keys) {
+      sum += score;
+    }
+
+    return sum / static_cast<double>(population.size());
+  }
+
+  void log(const std::vector<std::pair<double, Solution>>& population) const {
+    if (!params.log) {
+      return;
+    }
+
+    auto params_encoded =
+        std::format("{}_{}", params.population_size, params.mutation_rate);
+
+    logging::log_value(get_diversity(population),
+                       std::format("diversity_{}.csv", params_encoded));
+    logging::log_value(get_fitness(population),
+                       std::format("fitness_{}.csv", params_encoded));
   }
 
  public:
@@ -146,7 +250,6 @@ class Genetics {
         improver_(problem) {}
 
   Solution solve() {
-    const size_t n = problem.points.size();
     std::vector<std::pair<double, Solution>> population;
 
     for (size_t i = 0; i < params.population_size; ++i) {
@@ -177,7 +280,8 @@ class Genetics {
 
       const double child_score = get_score(problem, child);
 
-      // std::println("{} + {} = {}", population[p1].first, population[p2].first, child_score);
+      // std::println("{} + {} = {}", population[p1].first,
+      // population[p2].first, child_score);
 
       // replace the worst individual with child
       ArgMaximum<double> worst;
@@ -186,6 +290,8 @@ class Genetics {
       }
 
       population[*worst.argmax()] = {child_score, std::move(child)};
+
+      log(population);
     }
 
     // return the best from population

@@ -12,8 +12,9 @@
 using namespace std::chrono_literals;
 
 const std::vector<std::string> graded_problems = {
-    "tsp_51_1",  "tsp_100_3",  "tsp_200_2",
-    "tsp_574_1", "tsp_1889_1", "tsp_33810_1",
+    // "tsp_51_1",  "tsp_100_3",  "tsp_200_2",
+    "tsp_574_1",
+    // "tsp_1889_1", "tsp_33810_1",
 };
 
 void solve(const std::string& problem_name) {
@@ -23,9 +24,10 @@ void solve(const std::string& problem_name) {
   std::println("solving {}, #points = {}", path.filename().string(),
                problem.points.size());
 
-  tsp::GeneticsParams params{
-      .population_size = 10,
+  constexpr tsp::GeneticsParams params{
+      .population_size = 50,
       .mutation_rate = 0.2,
+      .log = true,
   };
 
   auto solution =

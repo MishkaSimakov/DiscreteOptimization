@@ -6,6 +6,7 @@ build
 
 output
 grid_search/
+log
 
 # ignore all tasks except those that are graded
 tasks/setcover/*

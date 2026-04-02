@@ -13,9 +13,10 @@ using namespace std::chrono_literals;
 using namespace tsp;
 
 Solution solve(const Problem& problem) {
-  GeneticsParams params{
+  constexpr GeneticsParams params{
       .population_size = 50,
       .mutation_rate = 0.2,
+      .log = false,
   };
 
   return Genetics(timing::Deadline::after(60s), problem, params).solve();

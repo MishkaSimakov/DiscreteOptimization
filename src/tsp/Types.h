@@ -25,6 +25,25 @@ struct Solution {
   std::vector<size_t> next;
 };
 
+// Distance function between solutions.
+// Defined as the number of edges that belong to the left tour but do not belong
+// to the right tour (or vice versa, result would not change).
+inline size_t distance(const Solution& left, const Solution& right) {
+  assert(left.next.size() == right.next.size() &&
+         "solutions must belong to the same problem");
+
+  const size_t n = left.next.size();
+  size_t result = 0;
+
+  for (size_t i = 0; i < n; ++i) {
+    if (left.next[i] != right.next[i] && i != right.next[left.next[i]]) {
+      ++result;
+    }
+  }
+
+  return result;
+}
+
 struct EvaluationResult {
   double score;
   bool is_valid;
