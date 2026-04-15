@@ -6,32 +6,42 @@ build
 
 output
 grid_search/
+log
 
 # ignore all tasks except those that are graded
-tasks/1/*
-tasks/2/*
-tasks/3/*
+tasks/setcover/*
+tasks/knapsack/*
+tasks/coloring/*
+tasks/tsp/*
 
 # setcover
-!tasks/1/sc_157_0
-!tasks/1/sc_330_0
-!tasks/1/sc_1000_11
-!tasks/1/sc_5000_1
-!tasks/1/sc_10000_5
-!tasks/1/sc_10000_2
+!tasks/setcover/sc_157_0
+!tasks/setcover/sc_330_0
+!tasks/setcover/sc_1000_11
+!tasks/setcover/sc_5000_1
+!tasks/setcover/sc_10000_5
+!tasks/setcover/sc_10000_2
 
 # knapsack
-!tasks/2/ks_30_0
-!tasks/2/ks_50_0
-!tasks/2/ks_200_0
-!tasks/2/ks_400_0
-!tasks/2/ks_1000_0
-!tasks/2/ks_10000_0
+!tasks/knapsack/ks_30_0
+!tasks/knapsack/ks_50_0
+!tasks/knapsack/ks_200_0
+!tasks/knapsack/ks_400_0
+!tasks/knapsack/ks_1000_0
+!tasks/knapsack/ks_10000_0
 
 # coloring
-!tasks/3/gc_50_3
-!tasks/3/gc_70_7
-!tasks/3/gc_100_5
-!tasks/3/gc_250_9
-!tasks/3/gc_500_1
-!tasks/3/gc_1000_5
+!tasks/coloring/gc_50_3
+!tasks/coloring/gc_70_7
+!tasks/coloring/gc_100_5
+!tasks/coloring/gc_250_9
+!tasks/coloring/gc_500_1
+!tasks/coloring/gc_1000_5
+
+# tsp
+!tasks/tsp/tsp_51_1
+!tasks/tsp/tsp_100_3
+!tasks/tsp/tsp_200_2
+!tasks/tsp/tsp_574_1
+!tasks/tsp/tsp_1889_1
+!tasks/tsp/tsp_33810_1

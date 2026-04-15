@@ -1,5 +1,7 @@
 #pragma once
 
+#include <chrono>
+#include <ranges>
 #include <vector>
 
 #include "utils/String.h"

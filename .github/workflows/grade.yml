@@ -50,6 +50,19 @@ jobs:
           - task: coloring
             instance: gc_1000_5
 
+          - task: tsp
+            instance: tsp_51_1
+          - task: tsp
+            instance: tsp_100_3
+          - task: tsp
+            instance: tsp_200_2
+          - task: tsp
+            instance: tsp_574_1
+          - task: tsp
+            instance: tsp_1889_1
+          - task: tsp
+            instance: tsp_33810_1
+
     steps:
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
