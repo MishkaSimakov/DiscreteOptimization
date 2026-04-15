@@ -11,21 +11,33 @@
 
 namespace tsp {
 
-inline bool all_different(std::vector<size_t> values) {
-  return std::unordered_set(values.begin(), values.end()).size() ==
-         values.size();
+inline void assert_all_different(std::vector<size_t> values) {
+  std::unordered_map<size_t, size_t> map;
+
+  for (size_t i = 0; i < values.size(); ++i) {
+    auto [itr, inserted] = map.emplace(values[i], i);
+
+    if (!inserted) {
+      throw std::runtime_error(
+          std::format("values[{}] == values[{}]", i, itr->second));
+    }
+  }
 }
 
 class LocalSearch3opt {
   constexpr static double tolerance = 1e-10;
 
   const Problem& problem;
+  const std::vector<std::vector<size_t>> candidates;
 
-  bool try_improve(TourStorage& tour,
-                   const std::vector<std::vector<size_t>>& candidates) {
+  size_t improvement_position_{0};
+
+  bool try_improve(TourStorage<>& tour) {
     const size_t n = problem.points.size();
 
-    for (size_t t1 = 0; t1 < n; ++t1) {
+    for (size_t i = 0; i < n; ++i) {
+      const size_t t1 = improvement_position_;
+
       for (const size_t direction : {0, 1}) {
         const size_t t2 = direction == 0 ? tour.succ(t1) : tour.pred(t1);
 
@@ -35,70 +47,91 @@ class LocalSearch3opt {
           }
 
           const size_t t4 = direction == 0 ? tour.pred(t3) : tour.succ(t3);
-          assert(all_different({t1, t2, t3, t4}));
+          assert_all_different({t1, t2, t3, t4});
 
-          double gain =
+          const double gain_2opt =
               problem.get_distance(t1, t2) + problem.get_distance(t3, t4) -
               problem.get_distance(t1, t4) - problem.get_distance(t2, t3);
 
-          if (gain < 0) {
+          if (gain_2opt <= tolerance) {
             continue;
           }
 
-          if (direction == 0) {
-            tour.apply_2opt(t1, t4);
-          } else {
-            tour.apply_2opt(t2, t3);
-          }
+          // std::println("  2-opt: {}, {}, {}, {}; gain = {}", t1, t2, t3, t4,
+          // gain_2opt);
+
+          tour.apply_2opt(t1, t2, t3);
 
           // choose t5
-          size_t t5;
+          std::optional<size_t> t5;
           for (const size_t t5_candidate : candidates[t4]) {
-            if (!tour.is_neighbors(t5_candidate, t4) && t5_candidate != t3) {
+            if (!tour.is_neighbors(t5_candidate, t4) &&
+                !tour.is_neighbors(t5_candidate, t2) && t5_candidate != t2) {
               t5 = t5_candidate;
               break;
             }
           }
 
-          // choose t6
-
-          if (gain > tolerance) {
-            // std::println("  2-opt: {}, {}, {}, {}; gain = {}", t1, t2, t3,
-            // t4, gain);
-
-            if (direction == 0) {
-              tour.apply_2opt(t1, t4);
-            } else {
-              tour.apply_2opt(t2, t3);
-            }
-
+          if (!t5) {
             return true;
           }
+
+          // choose t6
+          const size_t t6 = tour.get_2opt_node(t1, t4, *t5);
+
+          if (t6 == t1 || t6 == t2 || t6 == t3 || t6 == t4 || t6 == *t5) {
+            return true;
+          }
+
+          double gain_3opt =
+              problem.get_distance(t1, t2) + problem.get_distance(t3, t4) +
+              problem.get_distance(*t5, t6) - problem.get_distance(t1, t6) -
+              problem.get_distance(t2, t3) - problem.get_distance(t4, *t5);
+
+          // apply 3-opt only if gain is better than 2-opt
+          if (gain_3opt < gain_2opt) {
+            return true;
+          }
+
+          assert_all_different({t1, t2, t3, t4, *t5, t6});
+
+          // std::println("  3-opt: {}, {}, {}, {}, {}, {}; gain = {}", t1, t2,
+          // t3, t4, *t5, t6, gain_3opt);
+
+          tour.apply_2opt(t1, t4, *t5);
+
+          return true;
         }
       }
+
+      improvement_position_ = (improvement_position_ + 1) % n;
     }
 
     return false;
   }
 
  public:
-  explicit LocalSearch3opt(const Problem& problem) : problem(problem) {}
+  LocalSearch3opt(const Problem& problem,
+                  std::vector<std::vector<size_t>> candidates)
+      : problem(problem), candidates(std::move(candidates)) {
+    assert(this->candidates.size() == problem.points.size());
+  }
+
+  explicit LocalSearch3opt(const Problem& problem)
+      : LocalSearch3opt(problem, get_candidates_by_distance(problem, 5)) {}
 
   Solution solve(const Solution& initial_solution) {
     TourStorage tour(initial_solution);
-    auto candidates = get_candidates_by_distance(problem, 5);
 
-    std::println("  score: {}", get_score(problem, tour.to_solution()));
+    // std::println("  score: {}", get_score(problem, tour.to_solution()));
 
     while (true) {
       assert(tour.is_valid());
-      bool improved = try_improve(tour, candidates);
+      bool improved = try_improve(tour);
 
       if (!improved) {
         break;
       }
-
-      std::println("  score: {}", get_score(problem, tour.to_solution()));
     }
 
     return tour.to_solution();
@@ -106,3 +139,22 @@ class LocalSearch3opt {
 };
 
 }  // namespace tsp
+
+// solving tsp_51_1, #points = 51
+//   score: 506.36316536284625
+//   score: 451.25763690264796
+// solving tsp_100_3, #points = 100
+//   score: 25138.785452772314
+//   score: 21715.285071564685
+// solving tsp_200_2, #points = 200
+//   score: 36226.221438141445
+//   score: 32747.941928085587
+// solving tsp_574_1, #points = 574
+//   score: 47963.43948542793
+//   score: 42638.165981231585
+// solving tsp_1889_1, #points = 1889
+//   score: 391470.44549188897
+//   score: 362255.66837657226
+// solving tsp_33810_1, #points = 33810
+//   score: 78478867.03022262
+//   score: 72558326.50541551

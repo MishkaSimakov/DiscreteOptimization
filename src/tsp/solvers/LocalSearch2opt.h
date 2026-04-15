@@ -19,13 +19,13 @@ class LocalSearch2opt {
 
   // try_improve starts where it stopped in the previous iteration
   // this leads to HUGE time savings!
-  size_t improvement_position{0};
+  size_t improvement_position_{0};
 
-  bool try_improve(TourStorage& tour) {
+  bool try_improve(TourStorage<>& tour) {
     const size_t n = problem.points.size();
 
     for (size_t i = 0; i < n; ++i) {
-      const size_t t1 = improvement_position;
+      const size_t t1 = improvement_position_;
 
       for (const size_t direction : {0, 1}) {
         const size_t t2 = direction == 0 ? tour.succ(t1) : tour.pred(t1);
@@ -52,7 +52,7 @@ class LocalSearch2opt {
         }
       }
 
-      improvement_position = (improvement_position + 1) % n;
+      improvement_position_ = (improvement_position_ + 1) % n;
     }
 
     return false;
@@ -62,7 +62,7 @@ class LocalSearch2opt {
   LocalSearch2opt(const Problem& problem,
                   std::vector<std::vector<size_t>> candidates)
       : problem(problem), candidates(std::move(candidates)) {
-    assert(candidates.size() == problem.points.size());
+    assert(this->candidates.size() == problem.points.size());
   }
 
   explicit LocalSearch2opt(const Problem& problem)
@@ -71,6 +71,10 @@ class LocalSearch2opt {
   Solution solve(const Solution& initial_solution) {
     TourStorage tour(initial_solution);
 
+    return solve(std::move(tour)).to_solution();
+  }
+
+  TourStorage<> solve(TourStorage<> tour) {
     while (true) {
       assert(tour.is_valid());
       bool improved = try_improve(tour);
@@ -80,7 +84,7 @@ class LocalSearch2opt {
       }
     }
 
-    return tour.to_solution();
+    return std::move(tour);
   }
 };
 

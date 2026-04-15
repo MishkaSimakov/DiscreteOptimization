@@ -17,9 +17,12 @@ Solution solve(const Problem& problem) {
       .population_size = 50,
       .mutation_rate = 0.2,
       .log = false,
+    .similarity_replacement_threshold = 5,
   };
 
-  return Genetics(timing::Deadline::after(60s), problem, params).solve();
+  return Genetics<LocalSearch2opt>(timing::Deadline::after(10min), problem,
+                                   params)
+      .solve();
 }
 
 int main(int argc, char** argv) {

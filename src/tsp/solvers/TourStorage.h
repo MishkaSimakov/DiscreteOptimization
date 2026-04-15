@@ -8,6 +8,7 @@
 
 namespace tsp {
 
+template <bool with_history = false>
 class TourStorage {
   struct Node {
     size_t prev;
@@ -32,25 +33,15 @@ class TourStorage {
     return n + b_rank - a_rank + 1;
   }
 
-  // (a, succ(a)), (b, succ(b)) are replaced with (a, b), (succ(a), succ(b))
-  void apply_2opt_impl(size_t a, size_t b) {
-    if (get_arc_length(b, a) < get_arc_length(a, b)) {
-      std::swap(a, b);
-    }
+  // Reverses all edges on arc from a to b, updates ranks.
+  void reverse_arc(size_t a, size_t b) {
+    const size_t n = size();
 
-    // history_.emplace_back(a, b);
+    size_t rank = nodes_[a].rank;
+    size_t current = b;
 
-    const size_t n = nodes_.size();
+    const size_t end = pred(a);
 
-    const size_t t1 = a;
-    const size_t t2 = succ(a);
-    const size_t t3 = succ(b);
-    const size_t t4 = b;
-
-    size_t rank = nodes_[t2].rank;
-    size_t current = t4;
-
-    // reverse arc from a to b
     do {
       const size_t next = nodes_[current].prev;
 
@@ -59,7 +50,27 @@ class TourStorage {
 
       rank = (rank + 1) % n;
       current = next;
-    } while (current != t1);
+    } while (current != end);
+  }
+
+  // (a, succ(a)), (b, succ(b)) are replaced with (a, b), (succ(a), succ(b))
+  void apply_2opt_impl(size_t a, size_t b) {
+    if (get_arc_length(b, a) < get_arc_length(a, b)) {
+      std::swap(a, b);
+    }
+
+    if constexpr (with_history) {
+      history_.emplace_back(a, b);
+    }
+
+    const size_t n = nodes_.size();
+
+    const size_t t1 = a;
+    const size_t t2 = succ(a);
+    const size_t t3 = succ(b);
+    const size_t t4 = b;
+
+    reverse_arc(t2, t4);
 
     nodes_[t1].next = t4;
     nodes_[t4].prev = t1;
@@ -80,14 +91,12 @@ class TourStorage {
   explicit TourStorage(const Solution& solution)
       : nodes_(solution.next.size()) {
     size_t current = 0;
-    size_t rank = 0;
 
     for (size_t i = 0; i < solution.next.size(); ++i) {
-      nodes_[current].rank = rank;
+      nodes_[current].rank = i;
       nodes_[current].next = solution.next[current];
       nodes_[solution.next[current]].prev = current;
 
-      ++rank;
       current = solution.next[current];
     }
   }
@@ -126,6 +135,40 @@ class TourStorage {
     return succ(a) == b || pred(a) == b;
   }
 
+  void opt(const std::vector<size_t>& path) {
+    assert(path.size() % 2 == 0);
+
+    if (path.empty()) {
+      return;
+    }
+
+    // reverse arcs
+    for (size_t i = 0; 2 * i < path.size(); ++i) {
+      const size_t a0 = path[2 * i + 0];
+      const size_t a1 = path[2 * i + 1];
+      const size_t a2 = path[(2 * i + 2) % path.size()];
+
+      if (get_arc_length(a1, a2) > get_arc_length(a1, a0)) {
+        reverse_arc(a2, a1);
+      }
+    }
+
+    // reconnect edges
+    for (size_t i = 0; 2 * i < path.size(); ++i) {
+      const size_t a0 = path[2 * i + 0];
+      const size_t a1 = path[2 * i + 1];
+
+      nodes_[a0].next = a1;
+      nodes_[a1].prev = a0;
+    }
+
+    size_t current = 0;
+    for (size_t i = 0; i < size(); ++i) {
+      nodes_[current].rank = i;
+      current = succ(current);
+    }
+  }
+
   // for debug
   bool is_valid() const {
     const size_t n = nodes_.size();
@@ -157,13 +200,21 @@ class TourStorage {
     return Solution{result};
   }
 
-  Transaction start_transaction() const { return Transaction(history_.size()); }
+  Transaction start_transaction() const
+    requires(with_history)
+  {
+    return Transaction(history_.size());
+  }
 
-  void commit_transaction(Transaction transaction) {
+  void commit_transaction(Transaction transaction)
+    requires(with_history)
+  {
     history_.resize(transaction.size);
   }
 
-  void rollback_transaction(Transaction transaction) {
+  void rollback_transaction(Transaction transaction)
+    requires(with_history)
+  {
     for (size_t i = transaction.size; i < history_.size(); ++i) {
       auto [a, b] = history_[history_.size() - i - 1];
 
@@ -172,6 +223,40 @@ class TourStorage {
 
     history_.resize(transaction.size);
   }
+
+  size_t size() const { return nodes_.size(); }
 };
+
+template <bool with_history>
+double get_score(const Problem& problem,
+                 const TourStorage<with_history>& tour) {
+  const size_t n = problem.points.size();
+
+  double score = 0;
+
+  for (size_t i = 0; i < n; ++i) {
+    score += distance(problem.points[i], problem.points[tour.succ(i)]);
+  }
+
+  return score;
+}
+
+template <bool with_history>
+size_t distance(const TourStorage<with_history>& left,
+                const TourStorage<with_history>& right) {
+  assert(left.size() == right.size() &&
+         "solutions must belong to the same problem");
+
+  const size_t n = left.size();
+  size_t result = 0;
+
+  for (size_t i = 0; i < n; ++i) {
+    if (left.succ(i) != right.succ(i) && left.succ(i) != right.pred(i)) {
+      ++result;
+    }
+  }
+
+  return result;
+}
 
 }  // namespace tsp
