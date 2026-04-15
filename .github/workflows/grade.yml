@@ -63,6 +63,19 @@ jobs:
           - task: tsp
             instance: tsp_33810_1
 
+          - task: facility
+            instance: fl_25_2
+          - task: facility
+            instance: fl_100_1
+          - task: facility
+            instance: fl_200_7
+          - task: facility
+            instance: fl_500_7
+          - task: facility
+            instance: fl_1000_2
+          - task: facility
+            instance: fl_2000_2
+
     steps:
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
