@@ -19,7 +19,7 @@ int main(int argc, char** argv) {
 
   std::string problem_name = argv[1];
 
-  auto path = files::problem_path("tsp", problem_name);
+  auto path = files::problem_path("facility", problem_name);
   auto problem = read_problem(path);
 
   Solution solution;
