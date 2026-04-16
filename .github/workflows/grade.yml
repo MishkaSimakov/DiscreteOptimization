@@ -5,10 +5,6 @@ on:
 
 jobs:
   solve:
-    runs-on: ubuntu-latest
-
-#    if: ${{ github.ref_name == 'master' || matrix.task == github.ref_name }}
-
     strategy:
       fail-fast: false
       matrix:
@@ -78,44 +74,11 @@ jobs:
           - task: facility
             instance: fl_2000_2
 
-    steps:
-      - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
-
-      # standard compiler in ubuntu-latest is gcc
-      # it doesn't support <print>
-      - name: Install Clang
-        uses: egor-tensin/setup-clang@v2
-        with:
-          version: latest
-          platform: x64
-
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ github.ref }}
-
-      - name: Configure
-        run: |
-          cmake -B build -S . \
-            -DCMAKE_C_COMPILER=clang \
-            -DCMAKE_CXX_COMPILER=clang++ \
-            -DCMAKE_BUILD_TYPE=Release
-
-      - name: Build
-        run: cmake --build build --target ${{ matrix.task }}_grade
-
-      - name: Run task
-        run: |
-          echo "Running ${{ matrix.task }}"
-          ./build/src/${{ matrix.task }}_grade ${{ matrix.instance }}
-
-      - name: Upload results
-        uses: actions/upload-artifact@v6
-        with:
-          name: result-${{ matrix.task }}-${{ matrix.instance }}
-          path: output/${{ matrix.task }}
-          retention-days: 1
+    uses: ./.github/workflows/solve_instance.yml
+    with:
+      if: ${{ github.ref_name == 'master' || matrix.task == github.ref_name }}
+      task: ${{ matrix.task }}
+      instance: ${{ matrix.instance }}
 
   # each instance generates its own solution artifact. It is much nicer to have one merged artifact. This job does exactly this thing.
   collect-artifacts:
