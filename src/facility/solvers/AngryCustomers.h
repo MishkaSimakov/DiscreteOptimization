@@ -6,6 +6,7 @@
 
 #include "Greedy.h"
 #include "facility/Types.h"
+#include "helpers/Hashers.h"
 #include "helpers/Random.h"
 #include "utils/Accumulators.h"
 
@@ -15,6 +16,20 @@ struct GeneticsParameters {
   size_t population_size;
   double mutation_rate;
   double similarity_replacement_threshold;
+};
+
+struct OpenedStoresHash {
+  size_t operator()(const std::vector<bool>& opened) const {
+    StreamHasher hasher;
+
+    for (size_t i = 0; i < opened.size(); ++i) {
+      if (opened[i]) {
+        hasher << i;
+      }
+    }
+
+    return hasher.get_hash();
+  }
 };
 
 class AngryCustomers {
@@ -72,6 +87,10 @@ class AngryCustomers {
 
         // otherwise, try to swap with someone
         for (size_t j = 0; j < d; ++j) {
+          if (solution[i] == solution[j]) {
+            continue;
+          }
+
           // try to change j-th customer facility to assigned_facility
           if (demands[solution[i]] - customers[i].demand + customers[j].demand >
               facilities[solution[i]].capacity) {
@@ -121,7 +140,8 @@ class AngryCustomers {
     return result;
   }
 
-  // Returns fully grown individual and assigned facility for each customer
+  // Returns fully grown individual and assigned facility for each customer.
+  // Result of this function is cached.
   std::pair<std::vector<bool>, std::vector<size_t>> grow(
       std::vector<bool> individual) {
     const auto [n, d] = problem.shape();
@@ -349,12 +369,12 @@ class AngryCustomers {
         child = mutation(std::move(child));
       }
 
-      auto [grown_child, solution] = grow(std::move(child));
+      auto [grown_child, solution] = grow(child);
 
       const double child_score = get_score(problem, solution);
 
       // replacement scheme
-      std::pair replacement = {child_score, std::move(grown_child)};
+      std::pair replacement = {child_score, std::move(child)};
       const size_t replaced = find_replaced(replacement, population);
 
       population[replaced] = std::move(replacement);
@@ -365,6 +385,8 @@ class AngryCustomers {
                      get_population_diversity(population));
       }
     }
+
+    std::println("total iterations: {}", iteration);
 
     // return the best from population
     ArgMinimum<double> best;
