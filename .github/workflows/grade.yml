@@ -7,7 +7,7 @@ jobs:
   solve:
     runs-on: ubuntu-latest
 
-    if: ${{ github.ref_name == 'master' || matrix.task == github.ref_name }}
+#    if: ${{ github.ref_name == 'master' || matrix.task == github.ref_name }}
 
     strategy:
       fail-fast: false
