@@ -7,6 +7,10 @@ jobs:
   solve:
     runs-on: ubuntu-latest
 
+    if: |
+      github.ref_name == 'master' ||
+      matrix.task == github.ref_name
+
     strategy:
       fail-fast: false
       matrix:
@@ -75,10 +79,6 @@ jobs:
             instance: fl_1000_2
           - task: facility
             instance: fl_2000_2
-
-    if: |
-      github.ref_name == 'master' ||
-      matrix.task == github.ref_name
 
     steps:
       - name: Install jq
