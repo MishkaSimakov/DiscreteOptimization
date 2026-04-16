@@ -322,9 +322,9 @@ class AngryCustomers {
 
     std::ranges::sort(order, {}, [&](size_t i) { return population[i].first; });
 
-    size_t parent1 = order[0];
+    size_t parent1 = 0;
 
-    for (const size_t i : order) {
+    for (size_t i = 0; i + 1 < population.size(); ++i) {
       if (rnd::bernoulli(0.5, random_)) {
         parent1 = i;
         break;
@@ -332,9 +332,9 @@ class AngryCustomers {
     }
 
     const size_t parent2 =
-        order[parent1 + rnd::index(population.size() - parent1, random_)];
+        parent1 + rnd::index(population.size() - parent1 - 1, random_) + 1;
 
-    return {parent1, parent2};
+    return {order[parent1], order[parent2]};
   }
 
  public:
