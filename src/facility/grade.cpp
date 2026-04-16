@@ -5,12 +5,21 @@
 #include "Reader.h"
 #include "helpers/Files.h"
 #include "helpers/Time.h"
+#include "solvers/AngryCustomers.h"
 #include "solvers/Greedy.h"
 
 using namespace std::chrono_literals;
 using namespace facility;
 
-Solution solve(const Problem& problem) { return Greedy(problem).solve(); }
+Solution solve(const Problem& problem) {
+  GeneticsParameters params{
+      .population_size = 50,
+      .mutation_rate = 0.5,
+      .similarity_replacement_threshold = 2,
+  };
+
+  return AngryCustomers(problem, timing::Deadline::after(60s), params).solve();
+}
 
 int main(int argc, char** argv) {
   if (argc != 2) {

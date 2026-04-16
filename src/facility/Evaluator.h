@@ -6,12 +6,13 @@
 
 namespace facility {
 
-inline double get_score(const Problem& problem, const Solution& solution) {
+inline double get_score(const Problem& problem,
+                        const std::vector<size_t>& solution) {
   double score = 0;
   std::unordered_set<size_t> opened_facilities;
 
   for (size_t i = 0; i < problem.customers.size(); ++i) {
-    const size_t assigned_facility = solution.facility[i];
+    const size_t assigned_facility = solution[i];
 
     score += distance(problem.facilities[assigned_facility].position,
                       problem.customers[i].position);
@@ -24,6 +25,10 @@ inline double get_score(const Problem& problem, const Solution& solution) {
   }
 
   return score;
+}
+
+inline double get_score(const Problem& problem, const Solution& solution) {
+  return get_score(problem, solution.facility);
 }
 
 inline EvaluationResult evaluate(const Problem& problem,

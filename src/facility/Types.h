@@ -32,6 +32,10 @@ struct Customer {
 struct Problem {
   std::vector<Facility> facilities;
   std::vector<Customer> customers;
+
+  std::pair<size_t, size_t> shape() const {
+    return {facilities.size(), customers.size()};
+  }
 };
 
 struct Solution {
