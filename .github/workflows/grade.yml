@@ -76,6 +76,10 @@ jobs:
           - task: facility
             instance: fl_2000_2
 
+    if: |
+      github.ref_name == 'master' ||
+      matrix.task == github.ref_name
+
     steps:
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
