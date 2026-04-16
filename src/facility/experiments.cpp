@@ -36,7 +36,7 @@ void solve(const std::string& problem_name) {
   };
 
   auto solution =
-      AngryCustomers(problem, timing::Deadline::after(20min), params).solve();
+      AngryCustomers(problem, timing::Deadline::after(10s), params).solve();
   auto evaluation = evaluate(problem, solution);
 
   if (!evaluation.is_valid) {

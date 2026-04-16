@@ -6,7 +6,6 @@
 
 #include "Greedy.h"
 #include "facility/Types.h"
-#include "helpers/Hashers.h"
 #include "helpers/Random.h"
 #include "utils/Accumulators.h"
 
@@ -16,20 +15,6 @@ struct GeneticsParameters {
   size_t population_size;
   double mutation_rate;
   double similarity_replacement_threshold;
-};
-
-struct OpenedStoresHash {
-  size_t operator()(const std::vector<bool>& opened) const {
-    StreamHasher hasher;
-
-    for (size_t i = 0; i < opened.size(); ++i) {
-      if (opened[i]) {
-        hasher << i;
-      }
-    }
-
-    return hasher.get_hash();
-  }
 };
 
 class AngryCustomers {
@@ -63,13 +48,16 @@ class AngryCustomers {
   }
 
   std::vector<size_t> optimize_2opt(std::vector<size_t> solution,
-                                    std::vector<double> demands) {
+                                    std::vector<double> demands,
+                                    bool full_opt) {
     const auto [n, d] = problem.shape();
 
     const auto& customers = problem.customers;
     const auto& facilities = problem.facilities;
 
     bool changed;
+
+    // 124,
 
     do {
       changed = false;
@@ -118,12 +106,33 @@ class AngryCustomers {
           demands[solution[i]] += customers[j].demand - customers[i].demand;
           demands[solution[j]] += customers[i].demand - customers[j].demand;
 
+          // {
+          //   std::vector<size_t> order(facilities.size());
+          //   std::iota(order.begin(), order.end(), 0);
+          //
+          //   std::ranges::sort(order, {}, [&](size_t k) {
+          //     return distance(customers[i].position, facilities[k].position);
+          //   });
+          //
+          //   size_t index = 0;
+          //   for (size_t k = 0; k < facilities.size(); ++k) {
+          //     if (order[k] == solution[j]) {
+          //       index = k;
+          //       break;
+          //     }
+          //   }
+          //
+          //   std::println("  swapped: {}, {} (closest = {}, i = {}, index =
+          //   {}), gain = {}",
+          //                solution[i], solution[j], closest[i], i, index,
+          //                gain);
+          // }
           std::swap(solution[i], solution[j]);
 
           changed = true;
         }
       }
-    } while (changed);
+    } while (changed && full_opt);
 
     return solution;
   }
@@ -140,10 +149,9 @@ class AngryCustomers {
     return result;
   }
 
-  // Returns fully grown individual and assigned facility for each customer.
-  // Result of this function is cached.
+  // Returns fully grown individual and assigned facility for each customer
   std::pair<std::vector<bool>, std::vector<size_t>> grow(
-      std::vector<bool> individual) {
+      std::vector<bool> individual, bool full_opt) {
     const auto [n, d] = problem.shape();
 
     std::vector<size_t> result(d, 0);
@@ -196,24 +204,40 @@ class AngryCustomers {
       current_demand[result[i]] += problem.customers[i].demand;
     }
 
-    result = optimize_2opt(std::move(result), current_demand);
+    result = optimize_2opt(std::move(result), current_demand, full_opt);
 
     return {std::move(individual), std::move(result)};
   }
 
-  void crossover(std::vector<bool>& left, std::vector<bool>& right) {
+  std::vector<bool> crossover(const std::vector<bool>& left,
+                              const std::vector<bool>& right) {
     const auto [n, d] = problem.shape();
+    std::vector<bool> result(n);
 
     for (size_t i = 0; i < n; ++i) {
-      if (left[i] != right[i] && rnd::bernoulli(0.5, random_)) {
-        std::swap(left[i], right[i]);
+      if (left[i] && right[i]) {
+        result[i] = true;
+      } else if (!left[i] && !right[i]) {
+        result[i] = false;
+      } else {
+        result[i] = rnd::bernoulli(0.5, random_);
       }
     }
+
+    return result;
   }
 
-  void mutation(std::vector<bool>& individual) {
-    const size_t index = rnd::index(individual.size(), random_);
+  std::vector<bool> mutation(std::vector<bool> individual) {
+    // for (size_t i = 0; i < individual.size(); ++i) {
+    //   if (rnd::bernoulli(0.05, random_)) {
+    //     individual[i] = !individual[i];
+    //   }
+    // }
+
+    size_t index = rnd::index(individual.size(), random_);
     individual[index] = !individual[index];
+
+    return individual;
   }
 
   size_t find_replaced(
@@ -294,9 +318,7 @@ class AngryCustomers {
       : problem(problem),
         deadline(deadline),
         params(params),
-        closest(get_closest(problem)) {
-    assert(params.population_size % 2 == 0);
-  }
+        closest(get_closest(problem)) {}
 
   Solution solve() {
     // Each individual is a choice of opened facilities
@@ -305,64 +327,75 @@ class AngryCustomers {
     for (size_t i = 0; i < params.population_size; ++i) {
       auto individual = get_initial_individual();
 
-      auto [grown_individual, solution] = grow(std::move(individual));
+      auto [grown_individual, solution] = grow(std::move(individual), false);
 
       population.emplace_back(get_score(problem, solution),
                               std::move(grown_individual));
     }
 
-    std::vector<size_t> order(params.population_size);
-    std::iota(order.begin(), order.end(), 0);
-
     size_t iteration = 0;
 
     while (!deadline.is_over()) {
+      if (iteration % 1000 == 0) {
+        // O, throw away the worser part of it,
+        // And live the purer with the other half!
+        // - Hamlet
+
+        std::ranges::sort(population, {},
+                          [](const auto& p) { return p.first; });
+
+        auto range = std::ranges::unique(population);
+
+        std::println("  removed: {}", range.size());
+
+        // for (size_t i = 0; i < population.size(); ++i) {
+        //   for (bool v : population[i].second) {
+        //     std::print("{}", v ? 1 : 0);
+        //   }
+        //
+        //   std::println("");
+        // }
+
+        for (auto& individual : range) {
+          auto [new_individual, solution] =
+              grow(get_initial_individual(), false);
+
+          individual = {get_score(problem, solution),
+                        std::move(new_individual)};
+        }
+      }
+
       ++iteration;
 
-      // keep:
-      // 1. population_size / 10 of the best
-      // 2. 4 * population_size / 10 random among others
-      // 1 / 2 of the population in total
-      // then split remaining into pairs, each pair produces 2 children
-      // these 2 children are duplicated and mutated
+      // choose random parents
+      const auto parents = rnd::unique_indices(population.size(), 2, random_);
 
-      constexpr static double keep_best_ratio = 0.1;
+      // construct child
+      auto child = crossover(population[parents[0]].second,
+                             population[parents[1]].second);
 
-      std::ranges::sort(order, {},
-                        [&](size_t i) { return population[i].first; });
-
-      std::shuffle(order.begin() + params.population_size * keep_best_ratio,
-                   order.end(), random_);
-      std::shuffle(order.begin(), order.begin() + params.population_size / 2,
-                   random_);
-
-      for (size_t i = 0; 2 * i < params.population_size; i += 2) {
-        crossover(population[order[i]].second, population[order[i + 1]].second);
-
-        // copy and mutate
-        population[order[2 * i]] = population[order[i]];
-        mutation(population[order[2 * i]].second);
-
-        population[order[2 * i + 1]] = population[order[i + 1]];
-        mutation(population[order[2 * i + 1]].second);
+      if (rnd::bernoulli(params.mutation_rate, random_)) {
+        child = mutation(std::move(child));
       }
 
-      for (size_t i = 0; i < params.population_size; ++i) {
-        auto [grown_child, solution] = grow(std::move(population[i].second));
+      auto [grown_child, solution] = grow(std::move(child), false);
 
-        const double child_score = get_score(problem, solution);
+      const double child_score = get_score(problem, solution);
 
-        population[i] = {child_score, std::move(grown_child)};
-      }
+      // replacement scheme
+      std::pair replacement = {child_score, std::move(grown_child)};
+      const size_t replaced = find_replaced(replacement, population);
 
-      // if (iteration % 20 == 0) {
+      population[replaced] = std::move(replacement);
+
+      if (iteration % 20 == 0) {
         std::println("score = {}, diversity = {}",
                      get_population_score(population),
                      get_population_diversity(population));
-      // }
+      }
     }
 
-    std::println("total iterations: {}", iteration);
+    std::println("  total iterations = {}", iteration);
 
     // return the best from population
     ArgMinimum<double> best;
@@ -370,7 +403,8 @@ class AngryCustomers {
       best.record(i, population[i].first);
     }
 
-    auto [_, solution] = grow(std::move(population[*best.argmin()].second));
+    auto [_, solution] =
+        grow(std::move(population[*best.argmin()].second), true);
     return Solution{solution};
   }
 };
