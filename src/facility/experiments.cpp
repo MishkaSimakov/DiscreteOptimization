@@ -7,17 +7,13 @@
 #include "helpers/Time.h"
 #include "solvers/AngryCustomers.h"
 #include "solvers/Greedy.h"
+#include "solvers/GreedyFacilities.h"
 
 using namespace std::chrono_literals;
 using namespace facility;
 
 const std::vector<std::string> graded_problems = {
-    // "fl_25_2",
-    // "fl_100_1",
-    // "fl_200_7",
-    // "fl_500_7",
-    // "fl_1000_2",
-    "fl_2000_2",
+    "fl_25_2", "fl_100_1", "fl_200_7", "fl_500_7", "fl_1000_2", "fl_2000_2",
 };
 
 void solve(const std::string& problem_name) {
@@ -29,6 +25,7 @@ void solve(const std::string& problem_name) {
                problem.customers.size());
 
   // auto solution = Greedy(problem).solve();
+
   GeneticsParameters params{
       .population_size = 100,
       .mutation_rate = 0.5,
@@ -37,8 +34,8 @@ void solve(const std::string& problem_name) {
 
   auto solution =
       AngryCustomers(problem, timing::Deadline::after(60s), params).solve();
-  auto evaluation = evaluate(problem, solution);
 
+  auto evaluation = evaluate(problem, solution);
   if (!evaluation.is_valid) {
     throw std::runtime_error("Invalid solution");
   }
