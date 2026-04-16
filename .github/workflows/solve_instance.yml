@@ -16,6 +16,9 @@ on:
         description: 'Name of the instance that should be solved'
         required: true
         type: string
+
+run-name: solve (${{ inputs.instance }})
+
 jobs:
   solve:
     runs-on: ubuntu-latest
@@ -47,17 +50,17 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
-        run: cmake --build build --target ${{ matrix.task }}_grade
+        run: cmake --build build --target ${{ inputs.task }}_grade
 
       - name: Run task
         run: |
-          echo "Running ${{ matrix.task }}"
-          ./build/src/${{ matrix.task }}_grade ${{ matrix.instance }}
+          echo "Running ${{ inputs.task }}"
+          ./build/src/${{ inputs.task }}_grade ${{ inputs.instance }}
 
       - name: Upload results
         uses: actions/upload-artifact@v6
         with:
-          name: result-${{ matrix.task }}-${{ matrix.instance }}
-          path: output/${{ matrix.task }}
+          name: result-${{ inputs.task }}-${{ inputs.instance }}
+          path: output/${{ inputs.task }}
           retention-days: 1
 
