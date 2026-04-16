@@ -317,11 +317,6 @@ class AngryCustomers {
 
   std::pair<size_t, size_t> choose_parents(
       const std::vector<std::pair<double, std::vector<bool>>>& population) {
-    std::vector<size_t> order(population.size());
-    std::iota(order.begin(), order.end(), 0);
-
-    std::ranges::sort(order, {}, [&](size_t i) { return population[i].first; });
-
     size_t parent1 = 0;
 
     for (size_t i = 0; i + 1 < population.size(); ++i) {
@@ -334,7 +329,7 @@ class AngryCustomers {
     const size_t parent2 =
         parent1 + rnd::index(population.size() - parent1 - 1, random_) + 1;
 
-    return {order[parent1], order[parent2]};
+    return {parent1, parent2};
   }
 
  public:
@@ -366,16 +361,15 @@ class AngryCustomers {
     while (!deadline.is_over()) {
       ++iteration;
 
+      std::ranges::sort(population, {}, [](const auto& p) { return p.first; });
+
       if (iteration % 100 == 0) {
         // O, throw away the worser part of it,
         // And live the purer with the other half!
         // - Hamlet
 
-        std::ranges::sort(population, {},
-                          [](const auto& p) { return p.first; });
-
-        auto range = std::ranges::unique(population);
-        std::println("  removed: {}", range.size());
+        // auto range = std::ranges::unique(population);
+        // std::println("  removed: {}", range.size());
 
         // replace the worst half of the population with random guys
         // for (size_t i = 0; i < population.size(); ++i) {
