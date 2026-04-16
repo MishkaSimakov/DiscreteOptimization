@@ -13,7 +13,7 @@ using namespace facility;
 
 Solution solve(const Problem& problem) {
   GeneticsParameters params{
-      .population_size = 100,
+      .population_size = 1000,
       .mutation_rate = 0.5,
       .similarity_replacement_threshold = 2,
   };

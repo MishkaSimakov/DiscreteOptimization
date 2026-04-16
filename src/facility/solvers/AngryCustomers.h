@@ -49,7 +49,7 @@ class AngryCustomers {
 
   std::vector<size_t> optimize_2opt(std::vector<size_t> solution,
                                     std::vector<double> demands,
-                                    bool full_opt) {
+                                    std::optional<size_t> max_iterations) {
     const auto [n, d] = problem.shape();
 
     const auto& customers = problem.customers;
@@ -57,9 +57,11 @@ class AngryCustomers {
 
     bool changed;
 
-    // 124,
+    size_t iteration = 0;
 
     do {
+      ++iteration;
+
       changed = false;
 
       for (size_t i = 0; i < d; ++i) {
@@ -132,7 +134,7 @@ class AngryCustomers {
           changed = true;
         }
       }
-    } while (changed && full_opt);
+    } while (changed && (!max_iterations || iteration < *max_iterations));
 
     return solution;
   }
@@ -151,7 +153,7 @@ class AngryCustomers {
 
   // Returns fully grown individual and assigned facility for each customer
   std::pair<std::vector<bool>, std::vector<size_t>> grow(
-      std::vector<bool> individual, bool full_opt) {
+      std::vector<bool> individual, std::optional<size_t> max_opt_iterations) {
     const auto [n, d] = problem.shape();
 
     std::vector<size_t> result(d, 0);
@@ -204,7 +206,8 @@ class AngryCustomers {
       current_demand[result[i]] += problem.customers[i].demand;
     }
 
-    result = optimize_2opt(std::move(result), current_demand, full_opt);
+    result =
+        optimize_2opt(std::move(result), current_demand, max_opt_iterations);
 
     return {std::move(individual), std::move(result)};
   }
@@ -228,14 +231,14 @@ class AngryCustomers {
   }
 
   std::vector<bool> mutation(std::vector<bool> individual) {
-    // for (size_t i = 0; i < individual.size(); ++i) {
-    //   if (rnd::bernoulli(0.05, random_)) {
-    //     individual[i] = !individual[i];
-    //   }
-    // }
+    for (size_t i = 0; i < individual.size(); ++i) {
+      if (rnd::bernoulli(0.05, random_)) {
+        individual[i] = !individual[i];
+      }
+    }
 
-    size_t index = rnd::index(individual.size(), random_);
-    individual[index] = !individual[index];
+    // size_t index = rnd::index(individual.size(), random_);
+    // individual[index] = !individual[index];
 
     return individual;
   }
@@ -312,6 +315,28 @@ class AngryCustomers {
     return *score.min();
   }
 
+  std::pair<size_t, size_t> choose_parents(
+      const std::vector<std::pair<double, std::vector<bool>>>& population) {
+    std::vector<size_t> order(population.size());
+    std::iota(order.begin(), order.end(), 0);
+
+    std::ranges::sort(order, {}, [&](size_t i) { return population[i].first; });
+
+    size_t parent1 = order[0];
+
+    for (const size_t i : order) {
+      if (rnd::bernoulli(0.5, random_)) {
+        parent1 = i;
+        break;
+      }
+    }
+
+    const size_t parent2 =
+        order[parent1 + rnd::index(population.size() - parent1, random_)];
+
+    return {parent1, parent2};
+  }
+
  public:
   explicit AngryCustomers(const Problem& problem, timing::Deadline deadline,
                           GeneticsParameters params)
@@ -321,13 +346,16 @@ class AngryCustomers {
         closest(get_closest(problem)) {}
 
   Solution solve() {
+    constexpr size_t max_opt_iterations = 2;
+
     // Each individual is a choice of opened facilities
     std::vector<std::pair<double, std::vector<bool>>> population;
 
     for (size_t i = 0; i < params.population_size; ++i) {
       auto individual = get_initial_individual();
 
-      auto [grown_individual, solution] = grow(std::move(individual), false);
+      auto [grown_individual, solution] =
+          grow(std::move(individual), max_opt_iterations);
 
       population.emplace_back(get_score(problem, solution),
                               std::move(grown_individual));
@@ -336,7 +364,9 @@ class AngryCustomers {
     size_t iteration = 0;
 
     while (!deadline.is_over()) {
-      if (iteration % 1000 == 0) {
+      ++iteration;
+
+      if (iteration % 100 == 0) {
         // O, throw away the worser part of it,
         // And live the purer with the other half!
         // - Hamlet
@@ -345,40 +375,42 @@ class AngryCustomers {
                           [](const auto& p) { return p.first; });
 
         auto range = std::ranges::unique(population);
-
         std::println("  removed: {}", range.size());
 
+        // replace the worst half of the population with random guys
         // for (size_t i = 0; i < population.size(); ++i) {
         //   for (bool v : population[i].second) {
         //     std::print("{}", v ? 1 : 0);
         //   }
         //
-        //   std::println("");
+        //   std::println(" - {}", population[i].first);
         // }
 
-        for (auto& individual : range) {
-          auto [new_individual, solution] =
-              grow(get_initial_individual(), false);
+        std::println("  replaced!");
 
-          individual = {get_score(problem, solution),
-                        std::move(new_individual)};
+        const double replaced_ratio = 0.25;
+
+        for (size_t i = population.size() * (1 - replaced_ratio);
+             i < population.size(); ++i) {
+          auto [new_individual, solution] =
+              grow(get_initial_individual(), max_opt_iterations);
+
+          population[i] = {get_score(problem, solution),
+                           std::move(new_individual)};
         }
       }
 
-      ++iteration;
-
       // choose random parents
-      const auto parents = rnd::unique_indices(population.size(), 2, random_);
+      const auto [p1, p2] = choose_parents(population);
 
       // construct child
-      auto child = crossover(population[parents[0]].second,
-                             population[parents[1]].second);
+      auto child = crossover(population[p1].second, population[p2].second);
 
       if (rnd::bernoulli(params.mutation_rate, random_)) {
         child = mutation(std::move(child));
       }
 
-      auto [grown_child, solution] = grow(std::move(child), false);
+      auto [grown_child, solution] = grow(std::move(child), max_opt_iterations);
 
       const double child_score = get_score(problem, solution);
 
@@ -404,7 +436,7 @@ class AngryCustomers {
     }
 
     auto [_, solution] =
-        grow(std::move(population[*best.argmin()].second), true);
+        grow(std::move(population[*best.argmin()].second), std::nullopt);
     return Solution{solution};
   }
 };

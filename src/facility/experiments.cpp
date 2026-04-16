@@ -30,13 +30,13 @@ void solve(const std::string& problem_name) {
 
   // auto solution = Greedy(problem).solve();
   GeneticsParameters params{
-      .population_size = 10,
+      .population_size = 100,
       .mutation_rate = 0.5,
       .similarity_replacement_threshold = 2,
   };
 
   auto solution =
-      AngryCustomers(problem, timing::Deadline::after(10s), params).solve();
+      AngryCustomers(problem, timing::Deadline::after(60s), params).solve();
   auto evaluation = evaluate(problem, solution);
 
   if (!evaluation.is_valid) {
