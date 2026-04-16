@@ -369,12 +369,12 @@ class AngryCustomers {
         child = mutation(std::move(child));
       }
 
-      auto [grown_child, solution] = grow(child);
+      auto [grown_child, solution] = grow(std::move(child));
 
       const double child_score = get_score(problem, solution);
 
       // replacement scheme
-      std::pair replacement = {child_score, std::move(child)};
+      std::pair replacement = {child_score, std::move(grown_child)};
       const size_t replaced = find_replaced(replacement, population);
 
       population[replaced] = std::move(replacement);
