@@ -376,7 +376,7 @@ class AngryCustomers {
         // - Hamlet
 
         auto range = std::ranges::unique(population);
-        std::println("  removed: {}", range.size());
+        // std::println("  removed: {}", range.size());
 
         // replace the worst half of the population with random guys
         // for (size_t i = 0; i < population.size(); ++i) {
@@ -387,7 +387,7 @@ class AngryCustomers {
         //   std::println(" - {}", population[i].first);
         // }
 
-        std::println("  replaced!");
+        // std::println("  replaced!");
 
         const double replaced_ratio = 0.25;
 
@@ -424,11 +424,11 @@ class AngryCustomers {
 
       population[replaced] = std::move(replacement);
 
-      if (iteration % 20 == 0) {
-        std::println("score = {}, diversity = {}",
-                     get_population_score(population),
-                     get_population_diversity(population));
-      }
+      // if (iteration % 20 == 0) {
+      //   std::println("score = {}, diversity = {}",
+      //                get_population_score(population),
+      //                get_population_diversity(population));
+      // }
     }
 
     std::println("  total iterations = {}", iteration);

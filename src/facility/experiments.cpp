@@ -14,11 +14,8 @@ using namespace std::chrono_literals;
 using namespace facility;
 
 const std::vector<std::string> graded_problems = {
-    // "fl_25_2",
-    // "fl_100_1",
-    // "fl_200_7", "fl_500_7",
-    // "fl_1000_2",
-    "fl_2000_2",
+    // "fl_25_2", "fl_100_1", "fl_200_7", "fl_500_7", "fl_1000_2",
+  "fl_2000_2",
 };
 
 void solve(const std::string& problem_name) {
@@ -43,7 +40,7 @@ void solve(const std::string& problem_name) {
   std::println("finished genetics, starting SA...");
 
   solution =
-      SimulatedAnnealing(problem, timing::Deadline::after(10s)).solve(solution);
+      SimulatedAnnealing(problem, timing::Deadline::after(5s)).solve(solution);
 
   auto evaluation = evaluate(problem, solution);
   if (!evaluation.is_valid) {

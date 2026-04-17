@@ -48,8 +48,6 @@ class SimulatedAnnealing {
 
   Solution solve(const Solution& initial_solution) {
     constexpr double relative_start_temperature = 1e-4;
-    constexpr double delta = 0.01 * relative_start_temperature;
-    constexpr size_t iterations_per_temperature = 10;
 
     SolutionState state(problem, initial_solution);
     double current_cost = get_score(problem, initial_solution);
@@ -60,40 +58,71 @@ class SimulatedAnnealing {
     Solution best_solution = initial_solution;
     double best_cost = current_cost;
 
-    size_t iteration = 0;
-
     temperature_ = relative_start_temperature * current_cost;
     infeasibility_coef_ = 50;
 
+    const double delta = 0.01 * temperature_;
+
+    size_t iterations_until_change = 10;
+
+    // time in nanoseconds
+    ArithmeticMean<double> average_iteration_time;
+
     while (temperature_ > 0) {
-      bool changed;
+      auto iteration_duration = timing::timeit([&] {
+        bool changed;
 
-      if (rnd::bernoulli(0.9, random_)) {
-        changed = try_apply(change_customer_facility_manager, state);
-      } else {
-        changed = try_apply(swap_opened_facility_manager, state);
-      }
-
-      if (changed) {
-        current_cost = get_score(problem, state.solution);
-        const double infeasibility = get_infeasibility(problem, state.solution);
-
-        if (current_cost < best_cost && infeasibility == 0) {
-          best_cost = current_cost;
-          best_solution = state.solution;
+        if (rnd::bernoulli(0.9, random_)) {
+          changed = try_apply(change_customer_facility_manager, state);
+        } else {
+          changed = try_apply(swap_opened_facility_manager, state);
         }
-      }
 
-      if ((iteration + 1) % iterations_per_temperature == 0) {
+        if (changed) {
+          current_cost = get_score(problem, state.solution);
+          const double infeasibility =
+              get_infeasibility(problem, state.solution);
+
+          if (current_cost < best_cost && infeasibility == 0) {
+            best_cost = current_cost;
+            best_solution = state.solution;
+          }
+        }
+      });
+
+      average_iteration_time.record(
+          static_cast<double>(iteration_duration.count()));
+
+      if (iterations_until_change == 0) {
         temperature_ -= delta;
         infeasibility_coef_ /= 0.99;
+
+        const size_t remaining_temperature_changes =
+            static_cast<size_t>(temperature_ / delta);
+
+        const size_t remaining_nanoseconds =
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                deadline.remaining_time())
+                .count();
+
+        const size_t nanoseconds_per_iteration =
+            static_cast<size_t>(average_iteration_time.mean());
+
+        iterations_until_change = remaining_nanoseconds /
+                                  nanoseconds_per_iteration /
+                                  remaining_temperature_changes;
+
+        std::println("  # iterations = {}", iterations_until_change);
       }
-      ++iteration;
+
+      --iterations_until_change;
 
       if (deadline.is_over()) {
         break;
       }
     }
+
+    std::println("  T_end = {}, delta = {}", temperature_, delta);
 
     return best_solution;
   }
