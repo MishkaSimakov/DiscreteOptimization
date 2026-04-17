@@ -6,7 +6,7 @@
 
 #include "Greedy.h"
 #include "Neighborhood.h"
-#include "SimulatedAnnealing.h"
+#include "annealing/SimulatedAnnealing.h"
 #include "facility/Types.h"
 #include "helpers/Random.h"
 #include "helpers/Time.h"
