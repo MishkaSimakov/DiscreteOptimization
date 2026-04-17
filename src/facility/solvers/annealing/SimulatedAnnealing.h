@@ -48,8 +48,7 @@ class SimulatedAnnealing {
 
   Solution solve(const Solution& initial_solution) {
     constexpr double relative_start_temperature = 1e-4;
-    constexpr double relative_end_temperature = 1e-11;
-    constexpr double alpha = 0.99;  // temperature change rate
+    constexpr double delta = 0.01 * relative_start_temperature;
     constexpr size_t iterations_per_temperature = 10;
 
     SolutionState state(problem, initial_solution);
@@ -61,13 +60,12 @@ class SimulatedAnnealing {
     Solution best_solution = initial_solution;
     double best_cost = current_cost;
 
-    temperature_ = relative_start_temperature * current_cost;
-    const double end_temperature = relative_end_temperature * current_cost;
     size_t iteration = 0;
 
+    temperature_ = relative_start_temperature * current_cost;
     infeasibility_coef_ = 50;
 
-    while (temperature_ > end_temperature) {
+    while (temperature_ > 0) {
       bool changed;
 
       if (rnd::bernoulli(0.9, random_)) {
@@ -87,8 +85,8 @@ class SimulatedAnnealing {
       }
 
       if ((iteration + 1) % iterations_per_temperature == 0) {
-        temperature_ *= alpha;
-        infeasibility_coef_ /= alpha;
+        temperature_ -= delta;
+        infeasibility_coef_ /= 0.99;
       }
       ++iteration;
 
