@@ -105,6 +105,10 @@ class SimulatedAnnealing {
                 deadline.remaining_time())
                 .count();
 
+        if (remaining_nanoseconds == 0 || remaining_temperature_changes == 0) {
+          break;
+        }
+
         const size_t nanoseconds_per_iteration =
             static_cast<size_t>(average_iteration_time.mean());
 
