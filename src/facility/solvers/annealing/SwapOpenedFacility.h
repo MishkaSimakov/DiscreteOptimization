@@ -22,12 +22,17 @@ class SwapOpenedFacilityManager {
   size_t choose_closed_facility(const SolutionState& state, size_t opened) {
     auto closed = state.closed;
 
-    std::ranges::sort(closed, {}, [&](size_t i) {
-      return distance_sqr(state.problem.facilities[i].position,
+    // take 10 closest closed facilities as candidates
+    auto distance_proj = [&](const size_t facility) {
+      return distance_sqr(state.problem.facilities[facility].position,
                           state.problem.facilities[opened].position);
-    });
+    };
 
-    for (const size_t facility : closed) {
+    const auto nth = closed.size() < 10 ? closed.end() : closed.begin() + 10;
+    std::ranges::nth_element(closed, nth, {}, distance_proj);
+    std::ranges::sort(closed.begin(), nth, {}, distance_proj);
+
+    for (const size_t facility : std::span{closed.begin(), nth}) {
       if (rnd::bernoulli(0.4, random_)) {
         return facility;
       }

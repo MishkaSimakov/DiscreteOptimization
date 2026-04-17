@@ -40,7 +40,7 @@ void solve(const std::string& problem_name) {
   std::println("finished genetics, starting SA...");
 
   solution =
-      SimulatedAnnealing(problem, timing::Deadline::after(60s)).solve(solution);
+      SimulatedAnnealing(problem, timing::Deadline::after(10s)).solve(solution);
 
   auto evaluation = evaluate(problem, solution);
   if (!evaluation.is_valid) {
