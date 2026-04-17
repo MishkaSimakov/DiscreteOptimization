@@ -22,8 +22,14 @@ Solution solve(const Problem& problem) {
   // AngryCustomers(problem, timing::Deadline::after(45s), params).solve();
 
   auto solution = Greedy(problem).solve();
-  return SimulatedAnnealing(problem, timing::Deadline::after(60s))
-      .solve(solution);
+
+  auto solver = SimulatedAnnealing(problem, timing::Deadline::after(60s));
+
+  solver.add<ChangeCustomerFacilityManager>("change_customer_facility", 0.9);
+  solver.add<SwapOpenedFacilityManager>("swap_opened_facility", 0.05);
+  solver.add<OpenFacilityManager>("open_facility", 0.05);
+
+  return solver.solve(solution);
 }
 
 int main(int argc, char** argv) {
