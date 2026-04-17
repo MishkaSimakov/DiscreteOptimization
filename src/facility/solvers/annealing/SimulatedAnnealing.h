@@ -68,7 +68,7 @@ class SimulatedAnnealing {
     // time in nanoseconds
     ArithmeticMean<double> average_iteration_time;
 
-    while (temperature_ > 0) {
+    while (temperature_ > 1e-20) {
       auto iteration_duration = timing::timeit([&] {
         bool changed;
 
