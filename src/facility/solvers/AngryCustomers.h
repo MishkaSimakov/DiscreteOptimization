@@ -5,8 +5,11 @@
 #include <random>
 
 #include "Greedy.h"
+#include "Neighborhood.h"
+#include "SimulatedAnnealing.h"
 #include "facility/Types.h"
 #include "helpers/Random.h"
+#include "helpers/Time.h"
 #include "utils/Accumulators.h"
 
 namespace facility {
@@ -25,6 +28,9 @@ class AngryCustomers {
 
   // For each customer stores the closest facility
   const std::vector<size_t> closest;
+
+  // for each customer stores his neighbors, that is k closest customers
+  const std::vector<std::vector<size_t>> neighbors;
 
   std::default_random_engine random_;
 
@@ -76,7 +82,7 @@ class AngryCustomers {
         }
 
         // otherwise, try to swap with someone
-        for (size_t j = 0; j < d; ++j) {
+        for (size_t j : neighbors[i]) {
           if (solution[i] == solution[j]) {
             continue;
           }
@@ -338,7 +344,8 @@ class AngryCustomers {
       : problem(problem),
         deadline(deadline),
         params(params),
-        closest(get_closest(problem)) {}
+        closest(get_closest(problem)),
+        neighbors(get_neighbors(problem, 10)) {}
 
   Solution solve() {
     constexpr size_t max_opt_iterations = 2;
@@ -368,8 +375,8 @@ class AngryCustomers {
         // And live the purer with the other half!
         // - Hamlet
 
-        // auto range = std::ranges::unique(population);
-        // std::println("  removed: {}", range.size());
+        auto range = std::ranges::unique(population);
+        std::println("  removed: {}", range.size());
 
         // replace the worst half of the population with random guys
         // for (size_t i = 0; i < population.size(); ++i) {
@@ -384,8 +391,11 @@ class AngryCustomers {
 
         const double replaced_ratio = 0.25;
 
-        for (size_t i = population.size() * (1 - replaced_ratio);
-             i < population.size(); ++i) {
+        size_t remove_start = std::min(
+            static_cast<size_t>(population.size() * (1 - replaced_ratio)),
+            population.size() - range.size());
+
+        for (size_t i = remove_start; i < population.size(); ++i) {
           auto [new_individual, solution] =
               grow(get_initial_individual(), max_opt_iterations);
 

@@ -17,6 +17,9 @@ endfunction()
 
 function(add_experiments_target task_name)
     add_target(${task_name}_experiments ${task_name}/experiments.cpp)
+
+    target_compile_options(${task_name}_experiments PRIVATE -fsanitize=address)
+    target_link_options(${task_name}_experiments PRIVATE -fsanitize=address)
 endfunction()
 
 add_grade_target(setcover)

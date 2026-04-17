@@ -8,12 +8,17 @@
 #include "solvers/AngryCustomers.h"
 #include "solvers/Greedy.h"
 #include "solvers/GreedyFacilities.h"
+#include "solvers/SimulatedAnnealing.h"
 
 using namespace std::chrono_literals;
 using namespace facility;
 
 const std::vector<std::string> graded_problems = {
-    "fl_25_2", "fl_100_1", "fl_200_7", "fl_500_7", "fl_1000_2", "fl_2000_2",
+    // "fl_25_2",
+    "fl_100_1",
+    // "fl_200_7", "fl_500_7",
+    // "fl_1000_2",
+    // "fl_2000_2",
 };
 
 void solve(const std::string& problem_name) {
@@ -33,7 +38,12 @@ void solve(const std::string& problem_name) {
   };
 
   auto solution =
-      AngryCustomers(problem, timing::Deadline::after(60s), params).solve();
+      AngryCustomers(problem, timing::Deadline::after(50s), params).solve();
+
+  std::println("finished genetics, starting SA...");
+
+  solution =
+      SimulatedAnnealing(problem, timing::Deadline::after(10s)).solve(solution);
 
   auto evaluation = evaluate(problem, solution);
   if (!evaluation.is_valid) {

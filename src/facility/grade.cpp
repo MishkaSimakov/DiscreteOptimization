@@ -18,7 +18,11 @@ Solution solve(const Problem& problem) {
       .similarity_replacement_threshold = 2,
   };
 
-  return AngryCustomers(problem, timing::Deadline::after(60s), params).solve();
+  auto solution =
+      AngryCustomers(problem, timing::Deadline::after(50s), params).solve();
+
+  return SimulatedAnnealing(problem, timing::Deadline::after(10s))
+      .solve(solution);
 }
 
 int main(int argc, char** argv) {
