@@ -68,14 +68,31 @@ class SimulatedAnnealing {
     // time in nanoseconds
     ArithmeticMean<double> average_iteration_time;
 
+    // statistics
+    size_t change_customer_facility_count = 0;
+    size_t change_customer_facility_successful_count = 0;
+
+    size_t swap_opened_facility_count = 0;
+    size_t swap_opened_facility_successful_count = 0;
+
     while (temperature_ > 1e-20) {
       auto iteration_duration = timing::timeit([&] {
         bool changed;
 
         if (rnd::bernoulli(0.9, random_)) {
           changed = try_apply(change_customer_facility_manager, state);
+
+          ++change_customer_facility_count;
+          if (changed) {
+            ++change_customer_facility_successful_count;
+          }
         } else {
           changed = try_apply(swap_opened_facility_manager, state);
+
+          ++swap_opened_facility_count;
+          if (changed) {
+            ++swap_opened_facility_successful_count;
+          }
         }
 
         if (changed) {
@@ -126,6 +143,12 @@ class SimulatedAnnealing {
       }
     }
 
+    std::println("  change_customer_facility: {} (out of {})",
+                 change_customer_facility_successful_count,
+                 change_customer_facility_count);
+    std::println("  swap_opened_facility: {} (out of {})",
+                 swap_opened_facility_successful_count,
+                 swap_opened_facility_count);
     std::println("  T_end = {}, delta = {}", temperature_, delta);
 
     return best_solution;
