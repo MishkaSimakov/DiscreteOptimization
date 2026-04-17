@@ -26,21 +26,21 @@ void solve(const std::string& problem_name) {
                path.filename().string(), problem.facilities.size(),
                problem.customers.size());
 
-  // auto solution = Greedy(problem).solve();
+  auto solution = Greedy(problem).solve();
 
-  GeneticsParameters params{
-      .population_size = 100,
-      .mutation_rate = 0.5,
-      .similarity_replacement_threshold = 2,
-  };
-
-  auto solution =
-      AngryCustomers(problem, timing::Deadline::after(5s), params).solve();
+  // GeneticsParameters params{
+  //     .population_size = 100,
+  //     .mutation_rate = 0.5,
+  //     .similarity_replacement_threshold = 2,
+  // };
+  //
+  // auto solution =
+  //     AngryCustomers(problem, timing::Deadline::after(5s), params).solve();
 
   std::println("finished genetics, starting SA...");
 
   solution =
-      SimulatedAnnealing(problem, timing::Deadline::after(5s)).solve(solution);
+      SimulatedAnnealing(problem, timing::Deadline::after(60s)).solve(solution);
 
   auto evaluation = evaluate(problem, solution);
   if (!evaluation.is_valid) {

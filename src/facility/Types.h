@@ -20,6 +20,13 @@ inline double distance(Point x, Point y) {
   return std::sqrt(dx * dx + dy * dy);
 }
 
+inline double distance_sqr(Point x, Point y) {
+  const double dx = x.x - y.x;
+  const double dy = x.y - y.y;
+
+  return dx * dx + dy * dy;
+}
+
 struct Facility {
   double cost;
   double capacity;

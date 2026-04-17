@@ -23,23 +23,27 @@ class SimulatedAnnealing {
   double temperature_;
   double infeasibility_coef_;
 
+  // Tries to apply given action to current_solution.
+  // If successfully applied, returns gain. Otherwise, returns std::nullopt.
   template <typename Manager>
-  bool try_apply(Manager& manager, SolutionState& state) {
+  std::optional<double> try_apply(Manager& manager, SolutionState& state) {
     std::uniform_real_distribution<double> prob(0, 1);
 
     const auto action = manager.generate(std::as_const(state));
 
-    const double gain =
-        manager.get_gain(std::as_const(state), action, infeasibility_coef_);
+    const auto [score_gain, infeasibility_gain] =
+        manager.get_gain(std::as_const(state), action);
+
+    const double gain = score_gain + infeasibility_gain * infeasibility_coef_;
 
     // accept using simulated annealing algorithm
     if (gain > 0 || std::exp(gain / temperature_) > prob(random_)) {
       manager.apply_action(state, action);
 
-      return true;
+      return score_gain;
     }
 
-    return false;
+    return std::nullopt;
   }
 
  public:
@@ -77,26 +81,27 @@ class SimulatedAnnealing {
 
     while (temperature_ > 1e-20) {
       auto iteration_duration = timing::timeit([&] {
-        bool changed;
+        std::optional<double> gain;
 
         if (rnd::bernoulli(0.9, random_)) {
-          changed = try_apply(change_customer_facility_manager, state);
+          gain = try_apply(change_customer_facility_manager, state);
 
           ++change_customer_facility_count;
-          if (changed) {
+          if (gain) {
             ++change_customer_facility_successful_count;
           }
         } else {
-          changed = try_apply(swap_opened_facility_manager, state);
+          gain = try_apply(swap_opened_facility_manager, state);
 
           ++swap_opened_facility_count;
-          if (changed) {
+          if (gain) {
             ++swap_opened_facility_successful_count;
           }
         }
 
-        if (changed) {
-          current_cost = get_score(problem, state.solution);
+        if (gain) {
+          current_cost -= *gain;
+
           const double infeasibility =
               get_infeasibility(problem, state.solution);
 

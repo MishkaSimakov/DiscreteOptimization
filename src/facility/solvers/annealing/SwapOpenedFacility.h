@@ -23,8 +23,8 @@ class SwapOpenedFacilityManager {
     auto closed = state.closed;
 
     std::ranges::sort(closed, {}, [&](size_t i) {
-      return distance(state.problem.facilities[i].position,
-                      state.problem.facilities[opened].position);
+      return distance_sqr(state.problem.facilities[i].position,
+                          state.problem.facilities[opened].position);
     });
 
     for (const size_t facility : closed) {
@@ -44,8 +44,8 @@ class SwapOpenedFacilityManager {
     return SwapOpenedFacilityAction{opened, closed};
   }
 
-  double get_gain(const SolutionState& state, SwapOpenedFacilityAction action,
-                  double infeasibility_coef) {
+  std::pair<double, double> get_gain(const SolutionState& state,
+                                     SwapOpenedFacilityAction action) {
     const Facility& opened = state.problem.facilities[action.opened];
     const Facility& closed = state.problem.facilities[action.closed];
 
@@ -65,7 +65,7 @@ class SwapOpenedFacilityManager {
         std::max(state.demands[action.opened] - opened.capacity, 0.) -
         std::max(state.demands[action.opened] - closed.capacity, 0.);
 
-    return gain + infeasibility_gain * infeasibility_coef;
+    return {gain, infeasibility_gain};
   }
 
   void apply_action(SolutionState& state, SwapOpenedFacilityAction action) {

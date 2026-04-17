@@ -27,16 +27,21 @@ class ChangeCustomerFacilityManager {
   size_t choose_facility(const SolutionState& state, size_t customer) {
     auto opened = state.opened;
 
-    std::ranges::sort(opened, {}, [&](size_t facility) {
+    // take 10 closest opened facilities as candidates
+    auto distance_proj = [&](size_t facility) {
       if (facility == state.solution.facility[customer]) {
         return 1e10;
       }
 
-      return distance(state.problem.customers[customer].position,
-                      state.problem.facilities[facility].position);
-    });
+      return distance_sqr(state.problem.customers[customer].position,
+                          state.problem.facilities[facility].position);
+    };
 
-    for (const size_t facility : opened) {
+    const auto nth = opened.size() < 10 ? opened.end() : opened.begin() + 10;
+    std::ranges::nth_element(opened, nth, {}, distance_proj);
+    std::ranges::sort(opened.begin(), nth, {}, distance_proj);
+
+    for (const size_t facility : std::span{opened.begin(), nth}) {
       if (facility == state.solution.facility[customer]) {
         break;
       }
@@ -57,9 +62,8 @@ class ChangeCustomerFacilityManager {
     return ChangeCustomerFacilityAction{customer, facility};
   }
 
-  double get_gain(const SolutionState& state,
-                  ChangeCustomerFacilityAction action,
-                  double infeasibility_coef) {
+  std::pair<double, double> get_gain(const SolutionState& state,
+                                     ChangeCustomerFacilityAction action) {
     const size_t f0 = state.solution.facility[action.customer];
     const size_t f1 = action.facility;
 
@@ -82,7 +86,7 @@ class ChangeCustomerFacilityManager {
         std::max(state.demands[f1] - capacity_f1, 0.) -
         std::max(new_demand_f1 - capacity_f1, 0.);
 
-    return distance_gain + infeasibility_gain * infeasibility_coef;
+    return {distance_gain, infeasibility_gain};
   }
 
   void apply_action(SolutionState& state, ChangeCustomerFacilityAction action) {
