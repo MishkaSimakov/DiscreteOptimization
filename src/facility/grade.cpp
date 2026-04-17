@@ -18,12 +18,12 @@ Solution solve(const Problem& problem) {
       .similarity_replacement_threshold = 2,
   };
 
-  // auto solution =
-  // AngryCustomers(problem, timing::Deadline::after(45s), params).solve();
+  auto solution =
+      AngryCustomers(problem, timing::Deadline::after(45s), params).solve();
 
-  auto solution = Greedy(problem).solve();
+  // auto solution = Greedy(problem).solve();
 
-  auto solver = SimulatedAnnealing(problem, timing::Deadline::after(60s));
+  auto solver = SimulatedAnnealing(problem, timing::Deadline::after(15s));
 
   solver.add<ChangeCustomerFacilityManager>("change_customer_facility", 0.9);
   solver.add<SwapOpenedFacilityManager>("swap_opened_facility", 0.05);

@@ -133,6 +133,8 @@ class SimulatedAnnealing {
                  1e-3);
 
           if (current_cost < best_cost && infeasibility == 0) {
+            std::println("  [!] new best: {}", current_cost);
+
             best_cost = current_cost;
             best_solution = state.solution;
           }
