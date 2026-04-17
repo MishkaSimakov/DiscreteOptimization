@@ -3,6 +3,8 @@
 #include <chrono>
 #include <vector>
 
+#include "helpers/Time.h"
+
 namespace tsp {
 
 struct Point {
@@ -56,9 +58,9 @@ struct EvaluationResult {
 };
 
 struct Statistics : EvaluationResult {
-  std::chrono::milliseconds duration;
+  timing::Duration duration;
 
-  Statistics(EvaluationResult evaluation, std::chrono::milliseconds duration)
+  Statistics(EvaluationResult evaluation, timing::Duration duration)
       : EvaluationResult(evaluation), duration(duration) {}
 };
 
