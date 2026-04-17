@@ -19,9 +19,9 @@ Solution solve(const Problem& problem) {
   };
 
   auto solution =
-      AngryCustomers(problem, timing::Deadline::after(50s), params).solve();
+      AngryCustomers(problem, timing::Deadline::after(30s), params).solve();
 
-  return SimulatedAnnealing(problem, timing::Deadline::after(10s))
+  return SimulatedAnnealing(problem, timing::Deadline::after(30s))
       .solve(solution);
 }
 
