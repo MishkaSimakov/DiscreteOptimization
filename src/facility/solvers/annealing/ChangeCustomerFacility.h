@@ -55,6 +55,8 @@ class ChangeCustomerFacilityManager {
   }
 
  public:
+  explicit ChangeCustomerFacilityManager(const Problem& problem) {}
+
   ChangeCustomerFacilityAction generate(const SolutionState& state) {
     const size_t customer = choose_customer(state);
     const size_t facility = choose_facility(state, customer);
@@ -73,12 +75,17 @@ class ChangeCustomerFacilityManager {
     const double new_demand_f0 = state.demands[f0] - customer.demand;
     const double new_demand_f1 = state.demands[f1] + customer.demand;
 
-    double distance_gain =
+    double gain =
         distance(customer.position, state.problem.facilities[f0].position) -
         distance(customer.position, state.problem.facilities[f1].position);
 
     const double capacity_f0 = state.problem.facilities[f0].capacity;
     const double capacity_f1 = state.problem.facilities[f1].capacity;
+
+    // f0 may accidentally close
+    if (new_demand_f0 < 1e-10) {
+      gain += state.problem.facilities[f0].cost;
+    }
 
     const double infeasibility_gain =
         std::max(state.demands[f0] - capacity_f0, 0.) -
@@ -86,7 +93,7 @@ class ChangeCustomerFacilityManager {
         std::max(state.demands[f1] - capacity_f1, 0.) -
         std::max(new_demand_f1 - capacity_f1, 0.);
 
-    return {distance_gain, infeasibility_gain};
+    return {gain, infeasibility_gain};
   }
 
   void apply_action(SolutionState& state, ChangeCustomerFacilityAction action) {
@@ -105,19 +112,16 @@ class ChangeCustomerFacilityManager {
     state.demands[f0] = new_demand_f0;
     state.demands[f1] = new_demand_f1;
 
+    if (new_demand_f0 < 1e-10) {
+      state.closed.push_back(f0);
+      std::erase(state.opened, f0);
+    }
+
     if (old_demand_f0 <= state.problem.facilities[f0].capacity !=
             new_demand_f0 <= state.problem.facilities[f0].capacity ||
         old_demand_f1 <= state.problem.facilities[f1].capacity !=
             new_demand_f1 <= state.problem.facilities[f1].capacity) {
-      state.infeasible_customers.clear();
-
-      for (size_t i = 0; i < state.problem.customers.size(); ++i) {
-        const size_t f = state.solution.facility[i];
-
-        if (state.demands[f] > state.problem.facilities[f].capacity) {
-          state.infeasible_customers.push_back(i);
-        }
-      }
+      state.update_infeasible_customers();
     }
   }
 };

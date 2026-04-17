@@ -17,8 +17,8 @@ inline std::vector<std::vector<size_t>> get_neighbors(const Problem& problem,
 
   for (size_t i = 0; i < d; ++i) {
     auto proj = [i, &problem](size_t j) {
-      return distance(problem.customers[i].position,
-                      problem.customers[j].position);
+      return distance_sqr(problem.customers[i].position,
+                          problem.customers[j].position);
     };
 
     for (size_t j = 0; j < d; ++j) {

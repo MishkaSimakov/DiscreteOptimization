@@ -1,10 +1,13 @@
 #pragma once
 
 #include <cmath>
+#include <functional>
 #include <iostream>
 #include <random>
+#include <tuple>
 
 #include "ChangeCustomerFacility.h"
+#include "OpenFacility.h"
 #include "SwapOpenedFacility.h"
 #include "facility/Evaluator.h"
 #include "facility/Types.h"
@@ -22,6 +25,10 @@ class SimulatedAnnealing {
 
   double temperature_;
   double infeasibility_coef_;
+
+  std::vector<std::tuple<std::string, double,
+                         std::function<std::optional<double>(SolutionState&)>>>
+      actions_;
 
   // Tries to apply given action to current_solution.
   // If successfully applied, returns gain. Otherwise, returns std::nullopt.
@@ -50,14 +57,22 @@ class SimulatedAnnealing {
   explicit SimulatedAnnealing(const Problem& problem, timing::Deadline deadline)
       : problem(problem), deadline(deadline) {}
 
+  template <typename Manager>
+  void add(const std::string& name, double probability) {
+    actions_.emplace_back(
+        name, probability,
+        [&, manager = Manager(problem)](SolutionState& state) mutable {
+          return try_apply(manager, state);
+        });
+  }
+
   Solution solve(const Solution& initial_solution) {
+    std::uniform_real_distribution<double> prob(0, 1);
+
     constexpr double relative_start_temperature = 1e-4;
 
     SolutionState state(problem, initial_solution);
     double current_cost = get_score(problem, initial_solution);
-
-    ChangeCustomerFacilityManager change_customer_facility_manager;
-    SwapOpenedFacilityManager swap_opened_facility_manager;
 
     Solution best_solution = initial_solution;
     double best_cost = current_cost;
@@ -72,30 +87,39 @@ class SimulatedAnnealing {
     // time in nanoseconds
     ArithmeticMean<double> average_iteration_time;
 
-    // statistics
-    size_t change_customer_facility_count = 0;
-    size_t change_customer_facility_successful_count = 0;
+    // for each action name stores (total count, successful count)
+    std::unordered_map<std::string, std::pair<size_t, size_t>> actions_stats;
+    for (const auto& name : actions_ | std::views::elements<0>) {
+      actions_stats[name] = {0, 0};
+    }
 
-    size_t swap_opened_facility_count = 0;
-    size_t swap_opened_facility_successful_count = 0;
+    // simple sanity check
+    double total_prob = 0;
+    for (const double action_prob : actions_ | std::views::elements<1>) {
+      total_prob += action_prob;
+    }
+
+    assert(std::abs(total_prob - 1) < 1e-10);
 
     while (temperature_ > 1e-20) {
       auto iteration_duration = timing::timeit([&] {
         std::optional<double> gain;
 
-        if (rnd::bernoulli(0.9, random_)) {
-          gain = try_apply(change_customer_facility_manager, state);
+        auto value = prob(random_);
+        for (const auto& [name, probability, apply] : actions_) {
+          value -= probability;
 
-          ++change_customer_facility_count;
-          if (gain) {
-            ++change_customer_facility_successful_count;
-          }
-        } else {
-          gain = try_apply(swap_opened_facility_manager, state);
+          if (value <= 0) {
+            gain = apply(state);
 
-          ++swap_opened_facility_count;
-          if (gain) {
-            ++swap_opened_facility_successful_count;
+            auto& stats = actions_stats[name];
+            ++stats.first;
+
+            if (gain) {
+              ++stats.second;
+            }
+
+            break;
           }
         }
 
@@ -104,6 +128,9 @@ class SimulatedAnnealing {
 
           const double infeasibility =
               get_infeasibility(problem, state.solution);
+
+          assert(std::abs(get_score(problem, state.solution) - current_cost) <
+                 1e-3);
 
           if (current_cost < best_cost && infeasibility == 0) {
             best_cost = current_cost;
@@ -138,7 +165,7 @@ class SimulatedAnnealing {
                                   nanoseconds_per_iteration /
                                   remaining_temperature_changes;
 
-        std::println("  # iterations = {}", iterations_until_change);
+        std::println("  # iterations = {} (average itr time = {} ns)", iterations_until_change, average_iteration_time.mean());
       }
 
       --iterations_until_change;
@@ -148,12 +175,11 @@ class SimulatedAnnealing {
       }
     }
 
-    std::println("  change_customer_facility: {} (out of {})",
-                 change_customer_facility_successful_count,
-                 change_customer_facility_count);
-    std::println("  swap_opened_facility: {} (out of {})",
-                 swap_opened_facility_successful_count,
-                 swap_opened_facility_count);
+    std::println("  actions stats:");
+    for (const auto& name : actions_ | std::views::elements<0>) {
+      std::println("  {}: {} (out of {})", name, actions_stats[name].second,
+                   actions_stats[name].first);
+    }
     std::println("  T_end = {}, delta = {}", temperature_, delta);
 
     return best_solution;

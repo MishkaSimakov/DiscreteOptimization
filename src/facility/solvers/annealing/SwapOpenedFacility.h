@@ -42,6 +42,8 @@ class SwapOpenedFacilityManager {
   }
 
  public:
+  explicit SwapOpenedFacilityManager(const Problem& problem) {}
+
   SwapOpenedFacilityAction generate(const SolutionState& state) {
     const size_t opened = choose_opened_facility(state);
     const size_t closed = choose_closed_facility(state, opened);
