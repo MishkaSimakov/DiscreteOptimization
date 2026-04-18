@@ -26,14 +26,17 @@ class SimulatedAnnealing {
   double temperature_;
   double infeasibility_coef_;
 
-  std::vector<std::tuple<std::string, double,
-                         std::function<std::optional<double>(SolutionState&)>>>
+  std::vector<std::tuple<
+      std::string, double,
+      std::function<std::optional<std::pair<double, double>>(SolutionState&)>>>
       actions_;
 
   // Tries to apply given action to current_solution.
-  // If successfully applied, returns gain. Otherwise, returns std::nullopt.
+  // If successfully applied, returns gain and infeasibility gain. Otherwise,
+  // returns std::nullopt.
   template <typename Manager>
-  std::optional<double> try_apply(Manager& manager, SolutionState& state) {
+  std::optional<std::pair<double, double>> try_apply(Manager& manager,
+                                                     SolutionState& state) {
     std::uniform_real_distribution<double> prob(0, 1);
 
     const auto action = manager.generate(std::as_const(state));
@@ -47,7 +50,7 @@ class SimulatedAnnealing {
     if (gain > 0 || std::exp(gain / temperature_) > prob(random_)) {
       manager.apply_action(state, action);
 
-      return score_gain;
+      return std::pair{score_gain, infeasibility_gain};
     }
 
     return std::nullopt;
@@ -69,16 +72,23 @@ class SimulatedAnnealing {
   Solution solve(const Solution& initial_solution) {
     std::uniform_real_distribution<double> prob(0, 1);
 
-    constexpr double relative_start_temperature = 1e-4;
+    // 1e-3 \approx 8'930'000
+    // 1e-4 \approx 8'920'000
+    // 1e-5 \approx 9'240'000
+    constexpr double relative_start_temperature = 7 * 1e-5;
 
     SolutionState state(problem, initial_solution);
     double current_cost = get_score(problem, initial_solution);
+    double current_infeasibility = get_infeasibility(problem, initial_solution);
 
     Solution best_solution = initial_solution;
     double best_cost = current_cost;
 
     temperature_ = relative_start_temperature * current_cost;
-    infeasibility_coef_ = 50;
+    constexpr double base_infeasibility_coef_value = 50;
+    infeasibility_coef_ = base_infeasibility_coef_value;
+
+    double integral_infeasibility_component = 0;
 
     const double delta = 0.01 * temperature_;
 
@@ -103,7 +113,7 @@ class SimulatedAnnealing {
 
     while (temperature_ > 1e-20) {
       auto iteration_duration = timing::timeit([&] {
-        std::optional<double> gain;
+        std::optional<std::pair<double, double>> gain;
 
         auto value = prob(random_);
         for (const auto& [name, probability, apply] : actions_) {
@@ -124,15 +134,28 @@ class SimulatedAnnealing {
         }
 
         if (gain) {
-          current_cost -= *gain;
+          current_cost -= gain->first;
+          current_infeasibility -= gain->second;
 
-          const double infeasibility =
-              get_infeasibility(problem, state.solution);
+          if (current_infeasibility == 0) {
+            integral_infeasibility_component = 0;
+          } else {
+            integral_infeasibility_component += current_infeasibility;
+          }
+
+          infeasibility_coef_ =
+              base_infeasibility_coef_value *
+              std::exp(0.001 * (current_infeasibility +
+                                integral_infeasibility_component));
+
+          infeasibility_coef_ = std::min(1e6, infeasibility_coef_);
 
           assert(std::abs(get_score(problem, state.solution) - current_cost) <
                  1e-3);
+          assert(std::abs(get_infeasibility(problem, state.solution) -
+                          current_infeasibility) < 1e-3);
 
-          if (current_cost < best_cost && infeasibility == 0) {
+          if (current_cost < best_cost && current_infeasibility == 0) {
             std::println("  [!] new best: {}", current_cost);
 
             best_cost = current_cost;
@@ -146,7 +169,6 @@ class SimulatedAnnealing {
 
       if (iterations_until_change == 0) {
         temperature_ -= delta;
-        infeasibility_coef_ /= 0.99;
 
         const size_t remaining_temperature_changes =
             static_cast<size_t>(temperature_ / delta);
@@ -167,7 +189,13 @@ class SimulatedAnnealing {
                                   nanoseconds_per_iteration /
                                   remaining_temperature_changes;
 
-        std::println("  # iterations = {} (average itr time = {} ns)", iterations_until_change, average_iteration_time.mean());
+        std::println(
+            "  # iterations = {} (average itr time = {} ns), score = {}, inf = "
+            "{}, coef = "
+            "{}, T = {}, opened count = {}",
+            iterations_until_change, average_iteration_time.mean(),
+            current_cost, current_infeasibility, infeasibility_coef_,
+            temperature_, state.opened.size());
       }
 
       --iterations_until_change;
@@ -189,3 +217,5 @@ class SimulatedAnnealing {
 };
 
 }  // namespace facility
+
+// 8980674.58538693

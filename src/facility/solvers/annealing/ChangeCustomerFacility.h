@@ -15,6 +15,8 @@ struct ChangeCustomerFacilityAction {
 class ChangeCustomerFacilityManager {
   std::default_random_engine random_;
 
+  std::vector<size_t> buffer_;
+
   size_t choose_customer(const SolutionState& state) {
     if (rnd::bernoulli(0.5, random_) && !state.infeasible_customers.empty()) {
       return state.infeasible_customers[rnd::index(
@@ -24,7 +26,8 @@ class ChangeCustomerFacilityManager {
     return rnd::index(state.problem.customers.size(), random_);
   }
 
-  size_t choose_facility(const SolutionState& state, size_t customer) {
+  // choose facility among top 10 closest opened
+  size_t choose_facility_closest(const SolutionState& state, size_t customer) {
     auto opened = state.opened;
 
     // take 10 closest opened facilities as candidates
@@ -54,12 +57,34 @@ class ChangeCustomerFacilityManager {
     return opened[0];
   }
 
+  // choose facility among those that are common among neighbors
+  size_t choose_facility_neighbors(const SolutionState& state,
+                                   size_t customer) {
+    buffer_.clear();
+
+    for (size_t i = 0; i < state.neighbors[customer].size(); ++i) {
+      const size_t f = state.solution.facility[state.neighbors[customer][i]];
+
+      if (f != state.solution.facility[customer]) {
+        buffer_.push_back(f);
+      }
+    }
+
+    if (!buffer_.empty()) {
+      return buffer_[rnd::index(buffer_.size(), random_)];
+    }
+
+    // just choose the closest one
+    std::println("empty!");
+    throw std::runtime_error("Empty!");
+  }
+
  public:
   explicit ChangeCustomerFacilityManager(const Problem& problem) {}
 
   ChangeCustomerFacilityAction generate(const SolutionState& state) {
     const size_t customer = choose_customer(state);
-    const size_t facility = choose_facility(state, customer);
+    const size_t facility = choose_facility_neighbors(state, customer);
 
     return ChangeCustomerFacilityAction{customer, facility};
   }
@@ -127,3 +152,5 @@ class ChangeCustomerFacilityManager {
 };
 
 }  // namespace facility
+
+// 654018

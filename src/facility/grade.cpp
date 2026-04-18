@@ -19,15 +19,14 @@ Solution solve(const Problem& problem) {
   };
 
   auto solution =
-      AngryCustomers(problem, timing::Deadline::after(45s), params).solve();
+      AngryCustomers(problem, timing::Deadline::after(30s), params).solve();
 
-  // auto solution = Greedy(problem).solve();
+  std::println("finished genetics, starting SA...");
 
-  auto solver = SimulatedAnnealing(problem, timing::Deadline::after(15s));
+  auto solver = SimulatedAnnealing(problem, timing::Deadline::after(10min));
 
   solver.add<ChangeCustomerFacilityManager>("change_customer_facility", 0.9);
-  solver.add<SwapOpenedFacilityManager>("swap_opened_facility", 0.05);
-  solver.add<OpenFacilityManager>("open_facility", 0.05);
+  solver.add<SwapOpenedFacilityManager>("swap_opened_facility", 0.1);
 
   return solver.solve(solution);
 }
