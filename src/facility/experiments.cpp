@@ -15,7 +15,7 @@ using namespace std::chrono_literals;
 using namespace facility;
 
 const std::vector<std::string> graded_problems = {
-    // "fl_25_2", "fl_100_1", "fl_200_7",
+    "fl_25_2", "fl_100_1", "fl_200_7",
     "fl_500_7",
     // "fl_1000_2",
     // "fl_2000_2",
@@ -38,11 +38,11 @@ void solve(const std::string& problem_name) {
   };
 
   auto solution =
-      AngryCustomers(problem, timing::Deadline::after(30s), params).solve();
+      AngryCustomers(problem, timing::Deadline::after(10s), params).solve();
 
   std::println("finished genetics, starting SA...");
 
-  auto solver = SimulatedAnnealing(problem, timing::Deadline::after(10min));
+  auto solver = SimulatedAnnealing(problem, timing::Deadline::after(10s));
 
   constexpr double open_close_prob = 0.0001;
 

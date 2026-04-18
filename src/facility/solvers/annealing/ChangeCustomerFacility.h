@@ -75,8 +75,17 @@ class ChangeCustomerFacilityManager {
     }
 
     // just choose the closest one
-    std::println("empty!");
-    throw std::runtime_error("Empty!");
+    ArgMinimum<double, std::less<>> closest;
+
+    for (size_t facility : state.opened) {
+      if (facility != state.solution.facility[customer]) {
+        closest.record(
+            facility, distance_sqr(state.problem.facilities[facility].position,
+                                   state.problem.customers[customer].position));
+      }
+    }
+
+    return *closest.argmin();
   }
 
  public:
