@@ -17,13 +17,30 @@ class ChangeCustomerFacilityManager {
 
   std::vector<size_t> buffer_;
 
-  size_t choose_customer(const SolutionState& state) {
-    if (rnd::bernoulli(0.5, random_) && !state.infeasible_customers.empty()) {
-      return state.infeasible_customers[rnd::index(
-          state.infeasible_customers.size(), random_)];
-    }
+  // for each customer stores last iteration when his facility was changed
+  std::vector<size_t> last_change_;
 
-    return rnd::index(state.problem.customers.size(), random_);
+  static constexpr size_t taboo_duration = 500;
+
+  size_t choose_customer(const SolutionState& state) {
+    size_t chosen_customer;
+    size_t choose_iteration = 0;
+
+    do {
+      if (rnd::bernoulli(0.5, random_) && !state.infeasible_customers.empty()) {
+        chosen_customer = state.infeasible_customers[rnd::index(
+            state.infeasible_customers.size(), random_)];
+      } else {
+        chosen_customer = rnd::index(state.problem.customers.size(), random_);
+      }
+
+      ++choose_iteration;
+    } while (last_change_[chosen_customer] != 0 &&
+             state.changes_count - last_change_[chosen_customer] <
+                 taboo_duration &&
+             choose_iteration < 10);
+
+    return chosen_customer;
   }
 
   // choose facility among top 10 closest opened
@@ -89,7 +106,8 @@ class ChangeCustomerFacilityManager {
   }
 
  public:
-  explicit ChangeCustomerFacilityManager(const Problem& problem) {}
+  explicit ChangeCustomerFacilityManager(const Problem& problem)
+      : last_change_(problem.customers.size(), 0) {}
 
   ChangeCustomerFacilityAction generate(const SolutionState& state) {
     const size_t customer = choose_customer(state);
@@ -131,6 +149,8 @@ class ChangeCustomerFacilityManager {
   }
 
   void apply_action(SolutionState& state, ChangeCustomerFacilityAction action) {
+    last_change_[action.customer] = state.changes_count;
+
     const size_t f0 = state.solution.facility[action.customer];
     const size_t f1 = action.facility;
 
@@ -161,5 +181,3 @@ class ChangeCustomerFacilityManager {
 };
 
 }  // namespace facility
-
-// 654018

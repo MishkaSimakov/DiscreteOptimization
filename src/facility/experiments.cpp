@@ -15,7 +15,9 @@ using namespace std::chrono_literals;
 using namespace facility;
 
 const std::vector<std::string> graded_problems = {
-    "fl_25_2", "fl_100_1", "fl_200_7",
+    // "fl_25_2",
+    "fl_100_1",
+    // "fl_200_7",
     "fl_500_7",
     // "fl_1000_2",
     // "fl_2000_2",
@@ -42,14 +44,14 @@ void solve(const std::string& problem_name) {
 
   std::println("finished genetics, starting SA...");
 
-  auto solver = SimulatedAnnealing(problem, timing::Deadline::after(10s));
+  auto solver = SimulatedAnnealing(problem, timing::Deadline::after(10min));
 
-  constexpr double open_close_prob = 0.0001;
+  constexpr double open_close_prob = 0.001;
 
-  solver.add<ChangeCustomerFacilityManager>("change_customer_facility", 0.9);
-  solver.add<SwapOpenedFacilityManager>("swap_opened_facility", 0.1);
+  solver.add<ChangeCustomerFacilityManager>("change_customer_facility", 1 - open_close_prob);
+  // solver.add<SwapOpenedFacilityManager>("swap_opened_facility", 0.1);
 
-  // solver.add<OpenFacilityManager>("open_facility", open_close_prob / 2);
+  solver.add<OpenFacilityManager>("open_facility", open_close_prob);
   // solver.add<CloseFacilityManager>("close_facility", open_close_prob / 2);
 
   solution = solver.solve(solution);

@@ -14,6 +14,9 @@ struct SolutionState {
   // customer-customer neighborhood
   std::vector<std::vector<size_t>> neighbors;
 
+  // total solution changes in SimulatedAnnealing
+  size_t changes_count;
+
   // current solution
   Solution solution;
 
@@ -32,6 +35,7 @@ struct SolutionState {
   SolutionState(const Problem& problem, const Solution& solution)
       : problem(problem),
         neighbors(get_neighbors(problem, 100)),
+        changes_count(0),
         solution(solution),
         demands(problem.facilities.size(), 0) {
     std::unordered_set<size_t> opened_set;

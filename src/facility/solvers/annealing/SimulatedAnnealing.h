@@ -49,6 +49,7 @@ class SimulatedAnnealing {
     // accept using simulated annealing algorithm
     if (gain > 0 || std::exp(gain / temperature_) > prob(random_)) {
       manager.apply_action(state, action);
+      ++state.changes_count;
 
       return std::pair{score_gain, infeasibility_gain};
     }
