@@ -12,13 +12,12 @@ namespace coloring {
 // Avarice is a fancy word for greed. This class is a more sophisticated
 // implementation of greedy algorithm.
 class Avarice {
-  std::default_random_engine engine_;
+  const Graph& problem;
+  const timing::Deadline deadline;
 
-  timing::Deadline deadline_;
+  std::default_random_engine random_;
 
-  Solution start_;
-
-  void find_colors(const Graph& problem, const std::vector<size_t>& order,
+  void find_colors(const std::vector<size_t>& order,
                    std::vector<size_t>& colors,
                    std::vector<bool>& occupied_buffer) {
     size_t n = problem.adjacent.size();
@@ -75,7 +74,7 @@ class Avarice {
                            std::vector<size_t>& order) {
     std::vector<size_t> new_order(get_colors_count(colors));
     std::iota(new_order.begin(), new_order.end(), 0);
-    std::ranges::shuffle(new_order, engine_);
+    std::ranges::shuffle(new_order, random_);
 
     std::ranges::sort(order, {},
                       [&](size_t i) { return new_order[colors[i]]; });
@@ -85,7 +84,7 @@ class Avarice {
                     std::vector<size_t>& order) {
     std::uniform_int_distribution<int> distr(0, 12);
 
-    int decision = distr(engine_);
+    int decision = distr(random_);
     if (decision < 5) {
       update_order_largest_first(colors, order);
     } else if (decision < 10) {
@@ -96,28 +95,25 @@ class Avarice {
   }
 
  public:
-  Avarice(const Solution& start, timing::Deadline deadline)
-      : deadline_(deadline), start_(start) {}
+  Avarice(const Graph& problem, timing::Deadline deadline)
+      : problem(problem), deadline(deadline) {}
 
-  Solution solve(const Graph& problem) {
-    size_t n = problem.adjacent.size();
+  Solution solve(Solution initial_solution) {
+    const size_t n = problem.adjacent.size();
 
     std::vector<size_t> order(n);
     std::iota(order.begin(), order.end(), 0);
 
-    std::vector<size_t> colors = std::move(start_.colors);
+    std::vector<size_t> colors = std::move(initial_solution.colors);
     std::vector<bool> occupied_buffer(n + 1, false);
 
-    while (true) {
-      // update order using colors
+    while (!deadline.is_over()) {
       update_order(colors, order);
 
-      find_colors(problem, order, colors, occupied_buffer);
-
-      if (deadline_.is_over()) {
-        return Solution{colors};
-      }
+      find_colors(order, colors, occupied_buffer);
     }
+
+    return Solution{std::move(colors)};
   }
 };
 
