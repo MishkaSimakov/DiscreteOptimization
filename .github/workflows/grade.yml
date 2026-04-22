@@ -74,6 +74,19 @@ jobs:
           - task: facility
             instance: fl_2000_2
 
+          - task: vrp
+            instance: vrp_16_3_1
+          - task: vrp
+            instance: vrp_26_8_1
+          - task: vrp
+            instance: vrp_51_5_1
+          - task: vrp
+            instance: vrp_101_10_1
+          - task: vrp
+            instance: vrp_200_16_1
+          - task: vrp
+            instance: vrp_421_41_1
+
     uses: ./.github/workflows/solve_instance.yml
     with:
       if: ${{ github.ref_name == 'master' || matrix.task == github.ref_name }}

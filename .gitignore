@@ -8,12 +8,13 @@ output
 grid_search/
 log
 
-# ignore all tasks except those that are graded
+# ignore all instances except those that are graded
 tasks/setcover/*
 tasks/knapsack/*
 tasks/coloring/*
 tasks/tsp/*
 tasks/facility/*
+tasks/vrp/*
 
 # setcover
 !tasks/setcover/sc_157_0
@@ -54,3 +55,11 @@ tasks/facility/*
 !tasks/facility/fl_500_7
 !tasks/facility/fl_1000_2
 !tasks/facility/fl_2000_2
+
+# vrp
+!tasks/vrp/vrp_16_3_1
+!tasks/vrp/vrp_26_8_1
+!tasks/vrp/vrp_51_5_1
+!tasks/vrp/vrp_101_10_1
+!tasks/vrp/vrp_200_16_1
+!tasks/vrp/vrp_421_41_1
