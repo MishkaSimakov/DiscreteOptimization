@@ -1,22 +1,29 @@
 #pragma once
+
 #include <algorithm>
 #include <cassert>
 #include <print>
 #include <random>
+#include <unordered_set>
 
+#include "HillClimber.h"
+#include "SimulatedAnnealing.h"
+#include "helpers/Hashers.h"
 #include "knapsack/Evaluator.h"
 #include "knapsack/Types.h"
 
 namespace knapsack {
 
 class GRASP {
-  std::default_random_engine engine_;
+  std::default_random_engine random_;
 
   // Температура 1 - всегда выбираем случайное (не слишком плохое) множество.
   // Температура 0 - жадный алгоритм.
   double temperature_;
 
-  std::chrono::milliseconds time_limit_;
+  const timing::Deadline deadline;
+
+  std::unordered_set<size_t> visited_solutions_;
 
   Solution iteration(
       const Problem& problem,
@@ -28,7 +35,7 @@ class GRASP {
     size_t current_cost = 0;
 
     for (auto [_, id] : relative_costs) {
-      if (coin(engine_) < temperature_) {
+      if (coin(random_) < temperature_) {
         continue;
       }
 
@@ -46,18 +53,13 @@ class GRASP {
   }
 
  public:
-  explicit GRASP(double temperature, std::chrono::milliseconds time_limit)
-      : temperature_(temperature), time_limit_(time_limit) {}
+  explicit GRASP(double temperature, timing::Deadline deadline)
+      : temperature_(temperature), deadline(deadline) {}
 
   Solution solve(const Problem& problem) {
-    auto start_time = std::chrono::high_resolution_clock::now();
-
     std::vector<std::pair<double, size_t>> relative_costs(problem.items.size());
     for (size_t i = 0; i < problem.items.size(); ++i) {
-      auto item = problem.items[i];
-
-      relative_costs.emplace_back(
-          static_cast<double>(item.cost) / static_cast<double>(item.weight), i);
+      relative_costs[i] = {problem.items[i].relative_cost(), i};
     }
 
     std::ranges::sort(relative_costs, {}, [](std::pair<double, size_t> item) {
@@ -69,17 +71,37 @@ class GRASP {
 
     size_t iterations_cnt = 0;
 
+    size_t failed_iterations = 0;
+    size_t successful_iterations = 0;
+
     while (true) {
+      if (failed_iterations > successful_iterations && temperature_ < 0.5) {
+        std::println(
+            "temperature = {}, iterations: failed = {}, successful = {}",
+            temperature_, failed_iterations, successful_iterations);
+        temperature_ *= 1.1;
+        failed_iterations = 0;
+      }
+
       ++iterations_cnt;
 
-      auto current_time = std::chrono::high_resolution_clock::now();
-
-      if (duration_cast<std::chrono::milliseconds>(current_time - start_time) >
-          time_limit_) {
+      if (deadline.is_over()) {
         break;
       }
 
       auto solution = iteration(problem, relative_costs);
+
+      size_t hash = unordered_vector_hash(solution.chosen_items);
+      auto [_, inserted] = visited_solutions_.emplace(hash);
+
+      if (!inserted) {
+        ++failed_iterations;
+        continue;
+      }
+
+      ++successful_iterations;
+
+      solution = HillClimber(deadline).solve(problem, solution);
 
       auto evaluation = evaluate(problem, solution);
       assert(evaluation.is_valid);
@@ -87,8 +109,12 @@ class GRASP {
       if (evaluation.score > best_score) {
         best_score = evaluation.score;
         best_solution = std::move(solution);
+
+        std::println("  new best: {}", best_score);
       }
     }
+
+    std::println("iterations: {}", iterations_cnt);
 
     return best_solution;
   }

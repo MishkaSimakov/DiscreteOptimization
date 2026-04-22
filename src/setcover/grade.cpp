@@ -1,38 +1,44 @@
 #include <print>
 
+#include "Output.h"
 #include "helpers/Files.h"
+#include "helpers/Time.h"
 #include "setcover/Evaluator.h"
 #include "setcover/Reader.h"
 #include "setcover/solvers/GRASP.h"
+#include "solvers/HillClimber.h"
 
-const std::vector<std::string> kGradedProblems = {
-    "sc_157_0",  "sc_330_0",   "sc_1000_11",
-    "sc_5000_1", "sc_10000_5", "sc_10000_2",
-};
+using namespace std::chrono_literals;
+using namespace setcover;
 
-void solve(const std::filesystem::path& path) {
-  auto problem = setcover::read_problem(path);
+Solution solve(const Problem& problem) {
+  return GRASP(0.1, 0.4, timing::Deadline::after(60s)).solve(problem);
+}
+
+int main(int argc, char** argv) {
+  if (argc != 2) {
+    throw std::invalid_argument("Wrong number of arguments");
+  }
+
+  std::string problem_name = argv[1];
+
+  auto path = files::problem_path("setcover", problem_name);
+  auto problem = read_problem(path);
 
   std::println("solving {}, #elements = {}, #sets = {}",
                path.filename().string(), problem.elements_count,
                problem.sets.size());
 
-  auto grasp_solution =
-      setcover::GRASP(0.1, 0.4, std::chrono::seconds{30}).solve(problem);
-  auto grasp_evaluation = setcover::evaluate(problem, grasp_solution);
+  Solution solution;
 
-  if (!grasp_evaluation.is_valid) {
-    throw std::runtime_error(
-        "Something went terribly wrong! Solution is invalid");
+  auto duration = timing::timeit([&] { solution = solve(problem); });
+
+  auto evaluation = evaluate(problem, solution);
+
+  if (!evaluation.is_valid) {
+    throw std::runtime_error("Solution is invalid");
   }
 
-  std::println("  grasp: {}", grasp_evaluation.score);
-}
-
-int main() {
-  for (const auto& file : kGradedProblems) {
-    solve(files::problem_path(1, file));
-  }
-
-  return 0;
+  Statistics stats(evaluation, duration);
+  Output().store(problem_name, solution, stats);
 }

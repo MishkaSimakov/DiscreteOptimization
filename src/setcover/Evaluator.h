@@ -4,7 +4,18 @@
 
 namespace setcover {
 
-EvaluationResult evaluate(const Problem& problem, const Solution& solution) {
+inline size_t get_score(const Problem& problem, const Solution& solution) {
+  size_t score = 0;
+
+  for (size_t set_index : solution.chosen_sets) {
+    score += problem.sets[set_index].cost;
+  }
+
+  return score;
+}
+
+inline EvaluationResult evaluate(const Problem& problem,
+                                 const Solution& solution) {
   // check that all elements are covered
   for (size_t i = 0; i < problem.elements_count; ++i) {
     bool is_covered = false;

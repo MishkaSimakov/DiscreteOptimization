@@ -1,8 +1,16 @@
+# Вариации конструктивных методов
+
+В этом файле я собрал запуски разных вариаций конструктивного метода. Сначала идёт описание вариации, а потом её
+результат на оцениваемых задачах.
+
+## 1
+
 sets are sorted by size in descending order
 BestGreedyNode
 full lower bound calculation
 Отрезание глубоких ветвей сильно ухудшает результат
 
+```
 solving sc_157_0, #elements = 29, #sets = 157
   greedy score: 102100, constructive score: 95200 (7093805 nodes)
 solving sc_330_0, #elements = 1023, #sets = 330
@@ -16,8 +24,9 @@ solving sc_10000_5, #elements = 1000, #sets = 10000
 solving sc_10000_2, #elements = 1000, #sets = 10000
   greedy score: 192, constructive score: 186 (15175 nodes)
 total duration: 180908ms
+```
 
-
+## 2
 
 sets are sorted by size in descending order
 BestGreedyNode
@@ -25,6 +34,7 @@ full lower bound calculation
 Отрезание глубоких ветвей сильно ухудшает результат
 Порядок выбора множеств не фиксирован, а разный в каждой ветви: берём множество, которое жадный алгоритм выбирает первым
 
+```
 solving sc_157_0, #elements = 29, #sets = 157
   greedy score: 102100, constructive score: 97000 (6290107 nodes)
 solving sc_330_0, #elements = 1023, #sets = 330
@@ -38,14 +48,19 @@ solving sc_10000_5, #elements = 1000, #sets = 10000
 solving sc_10000_2, #elements = 1000, #sets = 10000
   greedy score: 192, constructive score: 179 (23957 nodes)
 total duration: 181749ms
+```
+
+## 3
 
 sets are sorted by size in descending order
 BestGreedyNode
 full lower bound calculation
 Отрезание глубоких ветвей сильно ухудшает результат
 Порядок выбора множеств не фиксирован, а разный в каждой ветви: берём множество, которое жадный алгоритм выбирает первым
-+ GRASP (100 итераций, температура: 0.05, порог качества: 0.75)
 
+GRASP (100 итераций, температура: 0.05, порог качества: 0.75)
+
+```
 solving sc_157_0, #elements = 29, #sets = 157
   greedy score: 102100, constructive score: 97000 (6290107 nodes)
 solving sc_330_0, #elements = 1023, #sets = 330
@@ -59,3 +74,4 @@ solving sc_10000_5, #elements = 1000, #sets = 10000
 solving sc_10000_2, #elements = 1000, #sets = 10000
   greedy score: 192, constructive score: 179 (23957 nodes)
 total duration: 181749ms
+```

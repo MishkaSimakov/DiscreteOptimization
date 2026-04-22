@@ -7,8 +7,12 @@
 
 namespace knapsack {
 
-Problem read_problem(const std::filesystem::path& path) {
+inline Problem read_problem(const std::filesystem::path& path) {
   std::ifstream is(path);
+
+  if (!is) {
+    throw std::runtime_error("Failed to open problem file.");
+  }
 
   size_t items_count;
   size_t max_weight;

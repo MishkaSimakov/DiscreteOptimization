@@ -1,0 +1,160 @@
+name: Run Tasks
+
+on:
+  push:
+
+jobs:
+  solve:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - task: setcover
+            instance: sc_157_0
+          - task: setcover
+            instance: sc_330_0
+          - task: setcover
+            instance: sc_1000_11
+          - task: setcover
+            instance: sc_5000_1
+          - task: setcover
+            instance: sc_10000_5
+          - task: setcover
+            instance: sc_10000_2
+
+          - task: knapsack
+            instance: ks_30_0
+          - task: knapsack
+            instance: ks_50_0
+          - task: knapsack
+            instance: ks_200_0
+          - task: knapsack
+            instance: ks_400_0
+          - task: knapsack
+            instance: ks_1000_0
+          - task: knapsack
+            instance: ks_10000_0
+
+          - task: coloring
+            instance: gc_50_3
+          - task: coloring
+            instance: gc_70_7
+          - task: coloring
+            instance: gc_100_5
+          - task: coloring
+            instance: gc_250_9
+          - task: coloring
+            instance: gc_500_1
+          - task: coloring
+            instance: gc_1000_5
+
+          - task: tsp
+            instance: tsp_51_1
+          - task: tsp
+            instance: tsp_100_3
+          - task: tsp
+            instance: tsp_200_2
+          - task: tsp
+            instance: tsp_574_1
+          - task: tsp
+            instance: tsp_1889_1
+          - task: tsp
+            instance: tsp_33810_1
+
+          - task: facility
+            instance: fl_25_2
+          - task: facility
+            instance: fl_100_1
+          - task: facility
+            instance: fl_200_7
+          - task: facility
+            instance: fl_500_7
+          - task: facility
+            instance: fl_1000_2
+          - task: facility
+            instance: fl_2000_2
+
+    uses: ./.github/workflows/solve_instance.yml
+    with:
+      if: ${{ github.ref_name == 'master' || matrix.task == github.ref_name }}
+      task: ${{ matrix.task }}
+      instance: ${{ matrix.instance }}
+
+  # each instance generates its own solution artifact. It is much nicer to have one merged artifact. This job does exactly this thing.
+  collect-artifacts:
+    runs-on: ubuntu-latest
+    needs: solve
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+
+      - name: Merge results
+        run: |
+          mkdir merged
+          find artifacts -type f -exec cp {} merged/ \;
+
+      - name: Upload merged artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: all-results
+          path: merged/
+
+  generate-summary:
+    runs-on: ubuntu-latest
+    needs: collect-artifacts
+
+    steps:
+      # library for parsing json
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: all-results
+          path: artifacts
+
+      - name: Generate summary table
+        run: |
+          echo "## Task Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          files=$(ls artifacts/*_stats.json 2>/dev/null || true)
+
+          if [ -z "$files" ]; then
+            echo "_No results found_" >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+
+          # Extract unique task names
+          tasks=$(for f in $files; do
+            basename "$f" _stats.json | cut -d'_' -f1
+          done | sort -u)
+
+          for task in $tasks; do
+            echo "### $task" >> $GITHUB_STEP_SUMMARY
+            echo "| Instance | Score | Duration (ms) |" >> $GITHUB_STEP_SUMMARY
+            echo "|----------|--------|---------------|" >> $GITHUB_STEP_SUMMARY
+
+            task_files=$(ls artifacts/${task}_*_stats.json 2>/dev/null | sort -V || true)
+
+            if [ -z "$task_files" ]; then
+              echo "| (no data) | - | - |" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              continue
+            fi
+
+            for file in $task_files; do
+              name=$(basename "$file" _stats.json)
+
+              score=$(jq '.score' "$file")
+              duration=$(jq '.duration' "$file")
+
+              echo "| $name | $score | $duration |" >> $GITHUB_STEP_SUMMARY
+            done
+
+            echo "" >> $GITHUB_STEP_SUMMARY
+          done
