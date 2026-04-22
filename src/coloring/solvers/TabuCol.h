@@ -117,7 +117,7 @@ class TabuCol {
                                  state.get_clash(v, old_color);
 
         if (new_score >= state.best_score &&
-            state.get_tabu(v, new_color) <= state.iteration) {
+            state.get_tabu(v, new_color) >= state.iteration) {
           continue;
         }
 
@@ -125,6 +125,8 @@ class TabuCol {
                          {new_score, tie_breaker(random_)});
       }
     }
+
+    assert(clashing_count != 0);
 
     if (!best_move.argmin()) {
       // select random clashing node and move it to random color
@@ -156,32 +158,40 @@ class TabuCol {
   TabuCol(const Graph& problem, timing::Deadline deadline)
       : problem(problem), deadline(deadline) {}
 
-  Solution solve(size_t colors_count) {
+  std::optional<Solution> solve(const Solution& initial_solution,
+                                size_t colors_count) {
     const size_t n = problem.adjacent.size();
-
-    const auto solution = get_initial_solution(problem, colors_count);
 
     SolutionState state;
 
     state.iteration = 1;
     state.max_colors = colors_count;
 
+    state.solution = initial_solution.colors;
+    for (size_t i = 0; i < n; ++i) {
+      if (state.solution[i] >= colors_count) {
+        state.solution[i] = random_() % colors_count;
+      }
+    }
+
     state.tabu = std::vector<size_t>(colors_count * n, 0);
 
     state.clash = std::vector<size_t>(colors_count * n, 0);
     for (size_t i = 0; i < n; ++i) {
       for (const size_t adj : problem.adjacent[i]) {
-        ++state.get_clash(i, solution[adj]);
+        ++state.get_clash(i, state.solution[adj]);
       }
     }
 
     state.score = 0;
     for (size_t i = 0; i < n; ++i) {
-      state.score += state.get_clash(i, solution[i]);
+      state.score += state.get_clash(i, state.solution[i]);
     }
 
-    state.solution = solution;
-    state.best_solution = solution;
+    assert(state.score % 2 == 0);
+    state.score /= 2;
+
+    state.best_solution = state.solution;
     state.best_score = state.score;
 
     while (!deadline.is_over()) {
@@ -189,9 +199,16 @@ class TabuCol {
 
       const size_t old_color = state.solution[node];
 
+      assert(new_color != old_color);
+
+      // std::println("    {}: {} -> {} (score: {})", node, old_color, new_color,
+                   // state.score);
+
       state.solution[node] = new_color;
       state.score = state.score + state.get_clash(node, new_color) -
                     state.get_clash(node, old_color);
+
+      state.get_tabu(node, old_color) = state.iteration + 10 * state.score;
 
       for (const size_t adj : problem.adjacent[node]) {
         --state.get_clash(adj, old_color);
@@ -203,12 +220,15 @@ class TabuCol {
       }
 
       if (state.score < state.best_score) {
+        std::println("  [!] new best: {}", state.score);
         state.best_solution = state.solution;
         state.best_score = state.score;
       }
+
+      ++state.iteration;
     }
 
-    return Solution{std::move(state.best_solution)};
+    return std::nullopt;
   }
 };
 
