@@ -7,27 +7,31 @@
 #include "setcover/Reader.h"
 #include "setcover/solvers/GRASP.h"
 #include "solvers/HillClimber.h"
+#include "solvers/HillClimber3.h"
+#include "solvers/Probability.h"
+#include "solvers/SimulatedAnnealing.h"
 
 using namespace std::chrono_literals;
+using namespace setcover;
 
 const std::vector<std::string> graded_problems = {
-    "sc_157_0",
+    // "sc_157_0",
     // "sc_330_0",
     // "sc_1000_11",
     // "sc_5000_1",
-  // "sc_10000_5",
-  // "sc_10000_2",
+    "sc_10000_5",
+    // "sc_10000_2",
 };
 
 void solve(const std::string& problem_name) {
   auto path = files::problem_path("setcover", problem_name);
-  auto problem = setcover::read_problem(path);
+  auto problem = read_problem(path);
 
   std::println("solving {}, #elements = {}, #sets = {}",
                path.filename().string(), problem.elements_count,
                problem.sets.size());
 
-  setcover::SimulatedAnnealingConfig sa_config{
+  SimulatedAnnealingConfig sa_config{
       .relative_start_temperature = 1e-2,
       .relative_end_temperature = 1e-7,
       .alpha = 0.99,
@@ -36,16 +40,34 @@ void solve(const std::string& problem_name) {
       .taboo_duration_multiplier = 1,
   };
 
-  auto grasp_solution =
-      setcover::GRASP(0.1, 0.5, timing::Deadline::after(60s), sa_config)
-          .solve(problem);
-  auto grasp_evaluation = setcover::evaluate(problem, grasp_solution);
+  GRASPConfig grasp_config{
+      .temperature = 0.1,
+      .quality_threshold = 0.5,
+  };
 
-  if (!grasp_evaluation.is_valid) {
-    throw std::runtime_error("GRASP solution is invalid");
+  auto solutions = SimulatedAnnealing(problem, timing::Deadline::after(20s),
+                                      sa_config, grasp_config)
+                       .solve();
+
+  Solution best_solution = solutions.front();
+
+  for (const auto solution : solutions) {
+    auto improved =
+        HillClimber3(problem, timing::Deadline::after(10s), 3).solve(solution);
+
+    if (get_score(problem, improved) < get_score(problem, solution)) {
+      best_solution = improved;
+      break;
+    }
   }
 
-  std::println("  GRASP = {}", grasp_evaluation.score);
+  auto evaluation = evaluate(problem, best_solution);
+
+  if (!evaluation.is_valid) {
+    throw std::runtime_error("Simulated Annealing solution is invalid");
+  }
+
+  std::println("  Simulated Annealing = {}", evaluation.score);
 }
 
 int main() {

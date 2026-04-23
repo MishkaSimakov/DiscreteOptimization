@@ -3,29 +3,29 @@
 #include <optional>
 #include <random>
 
-#include "HillClimber2.h"
-#include "SimulatedAnnealing.h"
 #include "setcover/CoveringSetsPack.h"
 #include "setcover/Types.h"
 
 namespace setcover {
 
-class GRASP {
-  std::default_random_engine engine_;
-
+struct GRASPConfig {
   // Температура 1 - всегда выбираем случайное (не слишком плохое) множество.
   // Температура 0 - жадный алгоритм.
-  double temperature_;
+  double temperature;
 
   // Порог на выбор случайного множества. Пусть множество, которое выбрал бы
   // жадный алгоритм имеет относительную стоимость l. Тогда случайное множество
   // будет выбираться так, чтобы его относительная стоимость была хотя бы l *
   // quality_threshold_
-  const double quality_threshold;
+  double quality_threshold;
+};
 
-  const SimulatedAnnealingConfig simulated_annealing_config;
+class GRASP {
+  const Problem& problem;
+  GRASPConfig config_;
 
-  const timing::Deadline deadline;
+  CoveringSetsPack pack_;
+  std::default_random_engine random_;
 
   static std::pair<size_t, double> argmax_set(
       const std::vector<CoveringSet>& sets) {
@@ -61,99 +61,39 @@ class GRASP {
     return result;
   }
 
-  std::pair<Solution, size_t> iteration(const Problem& problem,
-                                        CoveringSetsPack& pack,
-                                        size_t best_score) {
+ public:
+  explicit GRASP(const Problem& problem, GRASPConfig config)
+      : problem(problem), config_(config), pack_(problem) {}
+
+  void set_config(GRASPConfig config) { config_ = config; }
+
+  Solution solve() {
     std::uniform_real_distribution<double> coin(0, 1);
     std::vector<size_t> result;
 
     size_t current_score = 0;
 
-    pack.reset();
+    pack_.reset();
 
     while (true) {
-      auto greedy_set = pack.max_cost_set();
+      auto greedy_set = pack_.max_cost_set();
 
       if (!greedy_set) {
         break;
       }
 
       size_t chosen_set = greedy_set->first;
-      if (coin(engine_) < temperature_) {
-        auto suitable_sets =
-            pack.get_default_sets(greedy_set->second * quality_threshold);
-
-        std::uniform_int_distribution<size_t> dist(0, suitable_sets.size() - 1);
-        chosen_set = suitable_sets[dist(engine_)];
+      if (coin(random_) < config_.temperature) {
+        chosen_set = pack_.get_random_default(
+            greedy_set->second * config_.quality_threshold, random_);
       }
 
       current_score += problem.sets[chosen_set].cost;
       result.push_back(chosen_set);
-      pack.include_set(chosen_set);
+      pack_.include_set(chosen_set);
     }
 
-    return std::pair{Solution{std::move(result)}, current_score};
-  }
-
- public:
-  explicit GRASP(double temperature, double quality_threshold,
-                 timing::Deadline deadline, SimulatedAnnealingConfig config)
-      : temperature_(temperature),
-        quality_threshold(quality_threshold),
-        simulated_annealing_config(config),
-        deadline(deadline) {}
-
-  Solution solve(const Problem& problem) {
-    CoveringSetsPack pack(problem);
-    Solution best_solution;
-    size_t best_score = 1e10;  // infinity
-
-    std::unordered_set<size_t> visited;
-
-    size_t failed_iterations = 0;
-    size_t successful_iterations = 0;
-
-    SimulatedAnnealing sa(deadline, simulated_annealing_config, problem);
-
-    while (true) {
-      if (failed_iterations > successful_iterations && temperature_ < 0.5) {
-        std::println(
-            "temperature = {}, iterations: failed = {}, successful = {}",
-            temperature_, failed_iterations, successful_iterations);
-        temperature_ *= 1.1;
-        failed_iterations = 0;
-      }
-
-      auto result = iteration(problem, pack, best_score);
-
-      const size_t hash = unordered_vector_hash(result.first.chosen_sets);
-      auto [_, inserted] = visited.emplace(hash);
-
-      if (inserted) {
-        // improve solution using Simulated Annealing
-        auto sa_improved = sa.solve(problem, result.first);
-        const size_t new_score = get_score(problem, sa_improved);
-
-        if (new_score < best_score) {
-          std::println("  {}", new_score);
-          best_score = new_score;
-          best_solution = std::move(sa_improved);
-        }
-
-        ++successful_iterations;
-      } else {
-        ++failed_iterations;
-      }
-
-      if (deadline.is_over()) {
-        break;
-      }
-    }
-
-    std::println("iterations: successful = {}, failed = {}",
-                 successful_iterations, failed_iterations);
-
-    return best_solution;
+    return Solution{std::move(result)};
   }
 };
 

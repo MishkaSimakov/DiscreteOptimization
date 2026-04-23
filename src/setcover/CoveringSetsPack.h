@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "Types.h"
+#include "helpers/Random.h"
 #include "utils/Accumulators.h"
 
 namespace setcover {
@@ -97,6 +98,10 @@ class CoveringSetsPack {
            static_cast<double>(problem_.sets[set].elements.size());
   }
 
+  size_t get_elements_count(size_t set) const {
+    return problem_.sets[set].elements.size();
+  }
+
   std::span<const size_t> get_sets_covering(size_t element) const {
     return std::span{sets_.begin() + begins_[element],
                      sets_.begin() + begins_[element + 1]};
@@ -121,25 +126,46 @@ class CoveringSetsPack {
     return covering_cost.min();
   }
 
-  // Returns all sets that are not included or excluded.
-  // Only sets with relative cost >= threshold are returned.
-  std::vector<size_t> get_default_sets(double threshold) const {
-    std::vector<size_t> result;
+  // Returns random set that is not included or excluded.
+  // Only sets with relative cost >= threshold are considered as candidates.
+  template <typename Gen>
+    requires std::uniform_random_bit_generator<std::remove_reference_t<Gen>>
+  size_t get_random_default(double threshold, Gen&& generator) const {
+    size_t default_count = 0;
 
     for (size_t i = 0; i < problem_.sets.size(); ++i) {
       if (states_[i] != SetState::DEFAULT || current_sizes_[i] == 0) {
         continue;
       }
 
-      double value = static_cast<double>(current_sizes_[i]) /
-                     static_cast<double>(problem_.sets[i].cost);
+      const double value = static_cast<double>(current_sizes_[i]) /
+                           static_cast<double>(problem_.sets[i].cost);
 
       if (value >= threshold) {
-        result.push_back(i);
+        ++default_count;
       }
     }
 
-    return result;
+    size_t index = rnd::index(default_count, generator);
+
+    for (size_t i = 0; i < problem_.sets.size(); ++i) {
+      if (states_[i] != SetState::DEFAULT || current_sizes_[i] == 0) {
+        continue;
+      }
+
+      const double value = static_cast<double>(current_sizes_[i]) /
+                           static_cast<double>(problem_.sets[i].cost);
+
+      if (value >= threshold) {
+        if (index == 0) {
+          return i;
+        }
+
+        --index;
+      }
+    }
+
+    std::unreachable();
   }
 
   std::optional<std::pair<size_t, double>> max_cost_set() const {
@@ -163,6 +189,29 @@ class CoveringSetsPack {
     return max_cost_value > 0
                ? std::optional{std::pair{max_cost_index, max_cost_value}}
                : std::nullopt;
+  }
+
+  std::vector<std::pair<double, size_t>> k_max_cost_sets(size_t count) const {
+    std::vector<std::pair<double, size_t>> result;
+
+    for (size_t i = 0; i < problem_.sets.size(); ++i) {
+      if (states_[i] != SetState::DEFAULT) {
+        continue;
+      }
+
+      double value = static_cast<double>(current_sizes_[i]) /
+                     static_cast<double>(problem_.sets[i].cost);
+
+      result.emplace_back(value, i);
+      std::ranges::push_heap(result, std::greater{});
+
+      if (result.size() > count) {
+        std::ranges::pop_heap(result, std::greater{});
+        result.pop_back();
+      }
+    }
+
+    return result;
   }
 
   void reset() {

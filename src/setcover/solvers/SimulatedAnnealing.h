@@ -4,6 +4,7 @@
 #include <iostream>
 #include <random>
 
+#include "GRASP.h"
 #include "helpers/Hashers.h"
 #include "helpers/Time.h"
 #include "setcover/CoveringSetsPack.h"
@@ -23,9 +24,11 @@ struct SimulatedAnnealingConfig {
 };
 
 class SimulatedAnnealing {
+  const Problem& problem;
   const timing::Deadline deadline;
 
-  const SimulatedAnnealingConfig config;
+  const SimulatedAnnealingConfig sa_config;
+  const GRASPConfig grasp_config;
 
   CoveringSetsPack pack_;
 
@@ -78,18 +81,12 @@ class SimulatedAnnealing {
     return set_index;
   }
 
- public:
-  explicit SimulatedAnnealing(timing::Deadline deadline,
-                              SimulatedAnnealingConfig config,
-                              const Problem& problem)
-      : deadline(deadline), config(config), pack_(problem) {}
-
-  Solution solve(const Problem& problem, const Solution& initial_solution) {
+  Solution apply_sa(Solution initial_solution) {
     std::uniform_real_distribution<double> random_accept(0, 1);
 
     // square root of neighborhood size
     const size_t taboo_duration =
-        config.taboo_duration_multiplier *
+        sa_config.taboo_duration_multiplier *
         std::sqrt(static_cast<double>(initial_solution.chosen_sets.size()));
 
     // (set index, last iteration when it was removed)
@@ -101,10 +98,10 @@ class SimulatedAnnealing {
     Solution best_solution = current_solution;
     size_t best_cost = current_cost;
 
-    double temperature =
-        config.relative_start_temperature * static_cast<double>(current_cost);
+    double temperature = sa_config.relative_start_temperature *
+                         static_cast<double>(current_cost);
     const double end_temperature =
-        config.relative_end_temperature * static_cast<double>(current_cost);
+        sa_config.relative_end_temperature * static_cast<double>(current_cost);
     size_t iteration = 0;
 
     // std::print("  {} -> ", current_cost);
@@ -160,8 +157,8 @@ class SimulatedAnnealing {
         current_solution.chosen_sets.push_back(removed);
       }
 
-      if ((iteration + 1) % config.iterations_per_temperature == 0) {
-        temperature *= config.alpha;
+      if ((iteration + 1) % sa_config.iterations_per_temperature == 0) {
+        temperature *= sa_config.alpha;
       }
       ++iteration;
 
@@ -173,6 +170,82 @@ class SimulatedAnnealing {
     // std::println("done");
 
     return best_solution;
+  }
+
+ public:
+  explicit SimulatedAnnealing(const Problem& problem, timing::Deadline deadline,
+                              SimulatedAnnealingConfig sa_config,
+                              GRASPConfig grasp_config)
+      : problem(problem),
+        deadline(deadline),
+        sa_config(sa_config),
+        grasp_config(grasp_config),
+        pack_(problem) {}
+
+  std::vector<Solution> solve() {
+    GRASPConfig current_grasp_config = grasp_config;
+    GRASP grasp(problem, current_grasp_config);
+
+    std::vector<Solution> best_solutions = {grasp.solve()};
+    size_t best_score = get_score(problem, best_solutions[0]);
+
+    std::unordered_set<size_t> visited;
+
+    size_t failed_iterations = 0;
+    size_t successful_iterations = 0;
+
+    while (!deadline.is_over()) {
+      if (failed_iterations > successful_iterations &&
+          current_grasp_config.temperature < 0.5) {
+        std::println(
+            "temperature = {}, iterations: failed = {}, successful = {}",
+            current_grasp_config.temperature, failed_iterations,
+            successful_iterations);
+        current_grasp_config.temperature *= 1.1;
+        failed_iterations = 0;
+
+        grasp.set_config(current_grasp_config);
+      }
+
+      auto solution = grasp.solve();
+
+      const size_t hash = unordered_vector_hash(solution.chosen_sets);
+      auto [_, inserted] = visited.emplace(hash);
+
+      if (inserted) {
+        // improve solution using Simulated Annealing
+        auto sa_improved = apply_sa(solution);
+
+        const size_t new_score = get_score(problem, sa_improved);
+
+        if (new_score <= best_score) {
+          best_solutions.push_back(sa_improved);
+
+          std::ranges::sort(sa_improved.chosen_sets);
+
+          for (const size_t set : sa_improved.chosen_sets) {
+            std::cout << "  " << set;
+          }
+
+          std::cout << std::endl;
+        }
+
+        if (new_score < best_score) {
+          best_score = new_score;
+
+          best_solutions.clear();
+          best_solutions.push_back(std::move(sa_improved));
+
+          std::println("  [!] new best: {}", best_score);
+        }
+
+        ++successful_iterations;
+      } else {
+        ++failed_iterations;
+      }
+    }
+
+    return best_solutions;
   }
 };
 
