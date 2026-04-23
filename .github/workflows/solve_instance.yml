@@ -1,0 +1,66 @@
+name: Solve Instance
+
+on:
+  workflow_call:
+    inputs:
+      if:
+        description: 'Whether to run this job'
+        required: false
+        default: true
+        type: boolean
+      task:
+        description: 'Name of the task that should be solved'
+        required: true
+        type: string
+      instance:
+        description: 'Name of the instance that should be solved'
+        required: true
+        type: string
+
+run-name: solve (${{ inputs.instance }})
+
+jobs:
+  solve:
+    runs-on: ubuntu-latest
+
+    if: ${{ inputs.if }}
+
+    steps:
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      # standard compiler in ubuntu-latest is gcc
+      # it doesn't support <print>
+      - name: Install Clang
+        uses: egor-tensin/setup-clang@v2
+        with:
+          version: latest
+          platform: x64
+
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Configure
+        run: |
+          cmake -B build -S . \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --target ${{ inputs.task }}_grade
+
+      - name: Run task
+        run: |
+          echo "Running ${{ inputs.task }}"
+          ./build/src/${{ inputs.task }}_grade ${{ inputs.instance }}
+
+      - name: Upload results
+        uses: actions/upload-artifact@v6
+        with:
+          name: result-${{ inputs.task }}-${{ inputs.instance }}
+          path: output/${{ inputs.task }}
+          retention-days: 1
+

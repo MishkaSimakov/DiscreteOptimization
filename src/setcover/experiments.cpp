@@ -20,7 +20,7 @@ const std::vector<std::string> graded_problems = {
 };
 
 void solve(const std::string& problem_name) {
-  auto path = files::problem_path(1, problem_name);
+  auto path = files::problem_path("setcover", problem_name);
   auto problem = setcover::read_problem(path);
 
   std::println("solving {}, #elements = {}, #sets = {}",

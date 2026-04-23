@@ -13,54 +13,68 @@
 #include "solvers/Avarice.h"
 #include "solvers/DSatur.h"
 #include "solvers/Greedy.h"
+#include "solvers/TabuCol.h"
 
 const std::vector<std::string> graded_problems = {
-    "gc_50_3", "gc_70_7", "gc_100_5", "gc_250_9", "gc_500_1", "gc_1000_5",
+    // "gc_50_3", "gc_70_7", "gc_100_5", "gc_250_9", "gc_500_1",
+    "gc_1000_5",
 };
 
 using namespace std::chrono_literals;
+using namespace coloring;
 
 void solve(const std::filesystem::path& path) {
-  auto problem = coloring::read_problem(path);
+  auto problem = read_problem(path);
   auto problem_name = path.filename().string();
 
   std::println("solving {}, #nodes = {}", problem_name,
                problem.adjacent.size());
 
-  auto greedy_solution = coloring::Greedy().solve(problem);
-  auto greedy_evaluation = coloring::evaluate(problem, greedy_solution);
+  auto dsatur_solution = DSatur().solve(problem);
+  auto dsatur_evaluation = evaluate(problem, dsatur_solution);
 
-  if (!greedy_evaluation.is_valid) {
-    throw std::runtime_error("Invalid solution!");
+  // if (!dsatur_evaluation.is_valid) {
+  //   throw std::runtime_error("Invalid DSatur solution!");
+  // }
+  //
+  // auto avarice_solution =
+  //     Avarice(problem, timing::Deadline::after(15s)).solve(dsatur_solution);
+  // auto avarice_evaluation = evaluate(problem, avarice_solution);
+  //
+  // if (!avarice_evaluation.is_valid) {
+  //   throw std::runtime_error("Invalid Avarice solution!");
+  // }
+
+  auto tabucol_solution = dsatur_solution;
+  auto deadline = timing::Deadline::after(30s);
+
+  while (true) {
+    auto score = evaluate(problem, tabucol_solution).score;
+    std::println("  score: {}", score);
+
+    auto new_solution =
+        TabuCol(problem, deadline).solve(tabucol_solution, score - 1);
+
+    if (!new_solution) {
+      break;
+    }
+
+    tabucol_solution = std::move(*new_solution);
   }
 
-  auto dsatur_solution = coloring::DSatur().solve(problem);
-  auto dsatur_evaluation = coloring::evaluate(problem, dsatur_solution);
-
-  if (!dsatur_evaluation.is_valid) {
-    throw std::runtime_error("Invalid solution!");
+  auto tabucol_evaluation = evaluate(problem, tabucol_solution);
+  if (!tabucol_evaluation.is_valid) {
+    throw std::runtime_error("Invalid TabuCol solution!");
   }
 
-  auto avarice =
-      coloring::Avarice(dsatur_solution, timing::Deadline::after(60s));
-  auto avarice_solution = avarice.solve(problem);
-  auto avarice_evaluation = coloring::evaluate(problem, avarice_solution);
-
-  if (!avarice_evaluation.is_valid) {
-    throw std::runtime_error("Invalid solution!");
-  }
-
-  std::println("  greedy={}, dsatur={}, avarice={}", greedy_evaluation.score,
-               dsatur_evaluation.score, avarice_evaluation.score);
-
-  coloring::Output().store(files::solution_path("coloring", problem_name),
-                           avarice_solution);
+  std::println("  DSatur = {}, TabuCol = {}", dsatur_evaluation.score,
+               tabucol_evaluation.score);
 }
 
 int main() {
   auto duration = timing::timeit([] {
     for (const auto& file : graded_problems) {
-      solve(files::problem_path(3, file));
+      solve(files::problem_path("coloring", file));
     }
   });
 

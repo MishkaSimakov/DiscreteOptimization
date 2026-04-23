@@ -3,16 +3,26 @@
 #include "Output.h"
 #include "helpers/Files.h"
 #include "helpers/Time.h"
-#include "knapsack/Evaluator.h"
-#include "knapsack/Reader.h"
-#include "knapsack/Types.h"
-#include "knapsack/solvers/GRASP.h"
+#include "solvers/Genetics.h"
+#include "solvers/Greedy.h"
+#include "solvers/LocalSearch2opt.h"
+#include "tsp/Evaluator.h"
+#include "tsp/Reader.h"
 
 using namespace std::chrono_literals;
-using namespace knapsack;
+using namespace tsp;
 
 Solution solve(const Problem& problem) {
-  return GRASP(0.1, timing::Deadline::after(60s)).solve(problem);
+  constexpr GeneticsParams params{
+      .population_size = 50,
+      .mutation_rate = 0.2,
+      .log = false,
+    .similarity_replacement_threshold = 5,
+  };
+
+  return Genetics<LocalSearch2opt>(timing::Deadline::after(10min), problem,
+                                   params)
+      .solve();
 }
 
 int main(int argc, char** argv) {
@@ -22,12 +32,11 @@ int main(int argc, char** argv) {
 
   std::string problem_name = argv[1];
 
-  auto path = files::problem_path("knapsack", problem_name);
+  auto path = files::problem_path("tsp", problem_name);
   auto problem = read_problem(path);
 
-  std::println("solving {}, #items = {}", problem_name, problem.items.size());
-
   Solution solution;
+
   auto duration = timing::timeit([&] { solution = solve(problem); });
 
   auto evaluation = evaluate(problem, solution);

@@ -18,7 +18,7 @@ const std::vector<std::string> graded_problems = {
 };
 
 void solve(const std::string& problem_name) {
-  auto path = files::problem_path(2, problem_name);
+  auto path = files::problem_path("knapsack", problem_name);
   auto problem = knapsack::read_problem(path);
 
   std::println("solving {}, #items = {}", path.filename().string(),

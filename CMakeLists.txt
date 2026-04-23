@@ -22,3 +22,4 @@ add_compile_definitions(LOG_FILEPATH="${CMAKE_CURRENT_LIST_DIR}/log")
 add_compile_definitions(RESOURCES_FILEPATH="${CMAKE_CURRENT_LIST_DIR}/resources")
 
 add_subdirectory(src)
+add_subdirectory(tests)

@@ -1,18 +1,24 @@
 #include <print>
 
+#include "Evaluator.h"
 #include "Output.h"
+#include "Reader.h"
 #include "helpers/Files.h"
 #include "helpers/Time.h"
-#include "knapsack/Evaluator.h"
-#include "knapsack/Reader.h"
-#include "knapsack/Types.h"
-#include "knapsack/solvers/GRASP.h"
+#include "solvers/AngryCustomers.h"
+#include "solvers/Greedy.h"
 
 using namespace std::chrono_literals;
-using namespace knapsack;
+using namespace facility;
 
 Solution solve(const Problem& problem) {
-  return GRASP(0.1, timing::Deadline::after(60s)).solve(problem);
+  GeneticsParameters params{
+      .population_size = 100,
+      .mutation_rate = 0.5,
+      .similarity_replacement_threshold = 2,
+  };
+
+  return AngryCustomers(problem, timing::Deadline::after(60s), params).solve();
 }
 
 int main(int argc, char** argv) {
@@ -22,12 +28,11 @@ int main(int argc, char** argv) {
 
   std::string problem_name = argv[1];
 
-  auto path = files::problem_path("knapsack", problem_name);
+  auto path = files::problem_path("facility", problem_name);
   auto problem = read_problem(path);
 
-  std::println("solving {}, #items = {}", problem_name, problem.items.size());
-
   Solution solution;
+
   auto duration = timing::timeit([&] { solution = solve(problem); });
 
   auto evaluation = evaluate(problem, solution);

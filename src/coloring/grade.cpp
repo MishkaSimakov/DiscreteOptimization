@@ -4,25 +4,32 @@
 #include "coloring/Evaluator.h"
 #include "coloring/Output.h"
 #include "coloring/Reader.h"
-#include "coloring/solvers/Avarice.h"
 #include "coloring/solvers/DSatur.h"
 #include "helpers/Files.h"
 #include "helpers/Time.h"
+#include "solvers/TabuCol.h"
 
 using namespace std::chrono_literals;
 using namespace coloring;
 
 Solution solve(const Graph& problem) {
-  auto deadline = timing::Deadline::after(60s);
+  auto solution = DSatur().solve(problem);
+  auto deadline = timing::Deadline::after(30s);
 
-  auto dsatur_solution = DSatur().solve(problem);
+  while (true) {
+    auto score = evaluate(problem, solution).score;
+    std::println("  score: {}", score);
 
-  if (!evaluate(problem, dsatur_solution).is_valid) {
-    throw std::runtime_error("Invalid DSatur solution!");
+    auto new_solution = TabuCol(problem, deadline).solve(solution, score - 1);
+
+    if (!new_solution) {
+      break;
+    }
+
+    solution = std::move(*new_solution);
   }
 
-  auto avarice = Avarice(dsatur_solution, deadline);
-  return avarice.solve(problem);
+  return solution;
 }
 
 int main(int argc, char** argv) {
@@ -32,7 +39,7 @@ int main(int argc, char** argv) {
 
   std::string problem_name = argv[1];
 
-  auto path = files::problem_path(3, problem_name);
+  auto path = files::problem_path("coloring", problem_name);
   auto problem = read_problem(path);
 
   std::println("solving {}, #nodes = {}", problem_name,

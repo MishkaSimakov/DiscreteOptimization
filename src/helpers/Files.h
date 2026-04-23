@@ -6,10 +6,9 @@
 
 namespace files {
 
-inline std::filesystem::path problem_path(size_t task_index,
+inline std::filesystem::path problem_path(std::string_view task_name,
                                           const std::string& problem_name) {
-  return std::filesystem::path(PATH_TO_TASKS) / std::to_string(task_index) /
-         problem_name;
+  return std::filesystem::path(PATH_TO_TASKS) / task_name / problem_name;
 }
 
 inline std::filesystem::path solution_path(std::string_view task_name,
