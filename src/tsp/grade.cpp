@@ -17,7 +17,7 @@ Solution solve(const Problem& problem) {
       .population_size = 50,
       .mutation_rate = 0.2,
       .log = false,
-    .similarity_replacement_threshold = 5,
+      .similarity_replacement_threshold = 5,
   };
 
   return Genetics<LocalSearch2opt>(timing::Deadline::after(10min), problem,
