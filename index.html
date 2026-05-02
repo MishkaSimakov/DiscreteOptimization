@@ -46,6 +46,18 @@
     }
     nav button:hover { color: #e6edf3; }
     nav button.active { color: #e6edf3; border-bottom-color: #58a6ff; }
+    nav a.nav-link {
+      padding: 10px 18px;
+      background: none;
+      border-bottom: 2px solid transparent;
+      color: #8b949e;
+      font-size: 0.875rem;
+      white-space: nowrap;
+      text-decoration: none;
+      margin-left: auto;
+      transition: color 0.15s;
+    }
+    nav a.nav-link:hover { color: #e6edf3; text-decoration: none; }
 
     .tab { display: none; padding: 28px; }
     .tab.active { display: block; }
@@ -142,7 +154,7 @@
     <h1>Discrete Optimization</h1>
     <p id="meta">Loading…</p>
   </header>
-  <nav id="nav"></nav>
+  <nav id="nav"><a href="compare.html" class="nav-link">Compare →</a></nav>
   <main id="main"></main>
 
   <script>
