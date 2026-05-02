@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Discrete Optimization Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      min-height: 100vh;
+    }
+
+    header {
+      padding: 20px 28px 16px;
+      border-bottom: 1px solid #21262d;
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+    }
+    header h1 { font-size: 1.25rem; color: #58a6ff; font-weight: 600; }
+    header p { font-size: 0.8rem; color: #8b949e; }
+
+    nav {
+      display: flex;
+      gap: 0;
+      padding: 0 28px;
+      background: #161b22;
+      border-bottom: 1px solid #21262d;
+      overflow-x: auto;
+    }
+    nav button {
+      padding: 10px 18px;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: #8b949e;
+      cursor: pointer;
+      font-size: 0.875rem;
+      white-space: nowrap;
+      transition: color 0.15s;
+    }
+    nav button:hover { color: #e6edf3; }
+    nav button.active { color: #e6edf3; border-bottom-color: #58a6ff; }
+
+    .tab { display: none; padding: 28px; }
+    .tab.active { display: block; }
+
+    .section-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #8b949e;
+      margin-bottom: 14px;
+      margin-top: 32px;
+    }
+    .section-label:first-child { margin-top: 0; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    thead th {
+      text-align: left;
+      padding: 8px 12px;
+      color: #8b949e;
+      font-weight: 500;
+      border-bottom: 1px solid #21262d;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    tbody td {
+      padding: 8px 12px;
+      border-bottom: 1px solid #161b22;
+    }
+    tbody tr:hover td { background: #161b22; }
+    td.mono { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 0.8rem; }
+    td.score-best { color: #3fb950; font-weight: 600; font-family: monospace; }
+    td.no-data { color: #8b949e; font-style: italic; }
+    a { color: #58a6ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 16px;
+    }
+    .chart-card {
+      background: #161b22;
+      border: 1px solid #21262d;
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .chart-card h3 {
+      font-size: 0.78rem;
+      color: #8b949e;
+      font-family: monospace;
+      margin-bottom: 12px;
+    }
+    .chart-card canvas { display: block; }
+
+    .scatter-card {
+      background: #161b22;
+      border: 1px solid #21262d;
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .empty-state {
+      color: #8b949e;
+      padding: 48px;
+      text-align: center;
+      font-size: 0.9rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 1px 7px;
+      border-radius: 10px;
+      font-size: 0.7rem;
+      font-family: monospace;
+      background: #21262d;
+      color: #8b949e;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Discrete Optimization</h1>
+    <p id="meta">Loading…</p>
+  </header>
+  <nav id="nav"></nav>
+  <main id="main"></main>
+
+  <script>
+    const REPO = 'https://github.com/MishkaSimakov/DiscreteOptimization';
+
+    const PROBLEMS = [
+      {
+        id: 'setcover', label: 'Set Cover', maximize: false,
+        instances: ['sc_157_0', 'sc_330_0', 'sc_1000_11', 'sc_5000_1', 'sc_10000_5', 'sc_10000_2'],
+      },
+      {
+        id: 'knapsack', label: 'Knapsack', maximize: true,
+        instances: ['ks_30_0', 'ks_50_0', 'ks_200_0', 'ks_400_0', 'ks_1000_0', 'ks_10000_0'],
+      },
+      {
+        id: 'coloring', label: 'Coloring', maximize: false,
+        instances: ['gc_50_3', 'gc_70_7', 'gc_100_5', 'gc_250_9', 'gc_500_1', 'gc_1000_5'],
+      },
+      {
+        id: 'tsp', label: 'TSP', maximize: false,
+        instances: ['tsp_51_1', 'tsp_100_3', 'tsp_200_2', 'tsp_574_1', 'tsp_1889_1', 'tsp_33810_1'],
+      },
+      {
+        id: 'facility', label: 'Facility', maximize: false,
+        instances: ['fl_25_2', 'fl_100_1', 'fl_200_7', 'fl_500_7', 'fl_1000_2', 'fl_2000_2'],
+      },
+    ];
+
+    const PALETTE = ['#58a6ff', '#3fb950', '#f78166', '#d2a8ff', '#ffa657', '#79c0ff'];
+
+    const CHART_DEFAULTS = {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: {
+          ticks: { color: '#8b949e', font: { size: 10 } },
+          grid: { color: '#21262d' },
+        },
+        y: {
+          ticks: { color: '#8b949e', font: { size: 10 } },
+          grid: { color: '#21262d' },
+        },
+      },
+    };
+
+    // --- Data ---
+
+    async function loadHistory() {
+      const resp = await fetch('history.jsonl');
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const text = await resp.text();
+      return text.trim().split('\n').filter(l => l.trim()).map(l => JSON.parse(l))
+        .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    }
+
+    function isBetter(a, b, maximize) {
+      return b == null ? true : (maximize ? a > b : a < b);
+    }
+
+    function computeBests(records) {
+      const bests = {};
+      for (const rec of records) {
+        if (!rec.results) continue;
+        for (const [key, val] of Object.entries(rec.results)) {
+          const task = key.split('/')[0];
+          const prob = PROBLEMS.find(p => p.id === task);
+          const maximize = prob ? prob.maximize : false;
+          if (!bests[key] || isBetter(val.score, bests[key].score, maximize)) {
+            bests[key] = { score: val.score, commit: rec.commit, branch: rec.branch, timestamp: rec.timestamp };
+          }
+        }
+      }
+      return bests;
+    }
+
+    function historyFor(records, key) {
+      return records.filter(r => r.results?.[key] != null);
+    }
+
+    // --- Formatting ---
+
+    function fmtScore(v) {
+      if (v == null) return '—';
+      const abs = Math.abs(v);
+      if (abs >= 1e6) return v.toLocaleString(undefined, { maximumFractionDigits: 0 });
+      if (abs >= 1e3) return v.toLocaleString(undefined, { maximumFractionDigits: 2 });
+      return v.toLocaleString(undefined, { maximumFractionDigits: 4 });
+    }
+
+    function fmtDate(ts) {
+      return new Date(ts).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
+    function sha7(commit) { return commit?.substring(0, 7) ?? ''; }
+
+    function commitLink(commit) {
+      const s = sha7(commit);
+      return REPO ? `<a href="${REPO}/commit/${commit}" target="_blank">${s}</a>` : `<span class="mono">${s}</span>`;
+    }
+
+    // --- Tabs ---
+
+    const tabs = {};
+
+    function buildTabs(ids) {
+      const nav = document.getElementById('nav');
+      const main = document.getElementById('main');
+      for (const { id, label } of ids) {
+        const btn = document.createElement('button');
+        btn.textContent = label;
+        btn.onclick = () => switchTab(id);
+        nav.appendChild(btn);
+
+        const div = document.createElement('div');
+        div.className = 'tab';
+        main.appendChild(div);
+
+        tabs[id] = { btn, div, rendered: false };
+      }
+    }
+
+    function switchTab(id) {
+      for (const [tid, { btn, div }] of Object.entries(tabs)) {
+        const active = tid === id;
+        btn.classList.toggle('active', active);
+        div.classList.toggle('active', active);
+      }
+      const t = tabs[id];
+      if (!t.rendered) {
+        t.rendered = true;
+        t.render();
+      }
+    }
+
+    // --- Renderers ---
+
+    function renderOverview(records, bests, div) {
+      let html = `<p class="section-label">All-time best scores</p>`;
+      html += `<table><thead><tr>
+        <th>Problem</th><th>Instance</th><th>Score</th>
+        <th>Commit</th><th>Branch</th><th>Date</th>
+      </tr></thead><tbody>`;
+
+      for (const prob of PROBLEMS) {
+        for (const inst of prob.instances) {
+          const key = `${prob.id}/${inst}`;
+          const best = bests[key];
+          if (best) {
+            html += `<tr>
+              <td>${prob.label}</td>
+              <td class="mono">${inst}</td>
+              <td class="score-best">${fmtScore(best.score)}</td>
+              <td class="mono">${commitLink(best.commit)}</td>
+              <td><span class="badge">${best.branch}</span></td>
+              <td>${fmtDate(best.timestamp)}</td>
+            </tr>`;
+          } else {
+            html += `<tr>
+              <td>${prob.label}</td>
+              <td class="mono">${inst}</td>
+              <td class="no-data" colspan="4">no data yet</td>
+            </tr>`;
+          }
+        }
+      }
+      html += `</tbody></table>`;
+      div.innerHTML = html;
+    }
+
+    function renderProblem(prob, records, div) {
+      // Progress section
+      let html = `<p class="section-label">Progress per instance</p><div class="charts-grid">`;
+      for (const inst of prob.instances) {
+        html += `<div class="chart-card"><h3>${inst}</h3><canvas id="prog-${inst}" height="180"></canvas></div>`;
+      }
+      html += `</div>`;
+
+      // Scatter section
+      html += `<p class="section-label">Score vs duration (all runs)</p>`;
+      html += `<div class="scatter-card"><canvas id="scatter-${prob.id}" height="380"></canvas></div>`;
+
+      div.innerHTML = html;
+
+      // Draw progress charts
+      for (let i = 0; i < prob.instances.length; i++) {
+        const inst = prob.instances[i];
+        const key = `${prob.id}/${inst}`;
+        const hist = historyFor(records, key);
+        const color = PALETTE[i % PALETTE.length];
+
+        new Chart(document.getElementById(`prog-${inst}`), {
+          type: 'line',
+          data: {
+            labels: hist.map(r => sha7(r.commit)),
+            datasets: [{
+              data: hist.map(r => r.results[key].score),
+              borderColor: color,
+              backgroundColor: color + '18',
+              borderWidth: 2,
+              tension: 0.3,
+              pointRadius: hist.length < 30 ? 4 : 2,
+              fill: true,
+            }],
+          },
+          options: {
+            ...CHART_DEFAULTS,
+            plugins: {
+              ...CHART_DEFAULTS.plugins,
+              tooltip: {
+                callbacks: {
+                  title: ctx => {
+                    const rec = hist[ctx[0].dataIndex];
+                    return `${sha7(rec.commit)} (${rec.branch})`;
+                  },
+                  label: ctx => ` ${fmtScore(ctx.raw)}`,
+                },
+              },
+            },
+          },
+        });
+      }
+
+      // Draw scatter chart
+      const scatterDatasets = prob.instances.map((inst, i) => {
+        const key = `${prob.id}/${inst}`;
+        const hist = historyFor(records, key);
+        return {
+          label: inst,
+          data: hist.map(r => ({
+            x: r.results[key].duration,
+            y: r.results[key].score,
+            _commit: r.commit,
+            _branch: r.branch,
+          })),
+          backgroundColor: PALETTE[i % PALETTE.length] + 'aa',
+          borderColor: PALETTE[i % PALETTE.length],
+          pointRadius: 5,
+          pointHoverRadius: 7,
+        };
+      });
+
+      new Chart(document.getElementById(`scatter-${prob.id}`), {
+        type: 'scatter',
+        data: { datasets: scatterDatasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          plugins: {
+            legend: {
+              labels: { color: '#8b949e', font: { size: 11 }, boxWidth: 12 },
+            },
+            tooltip: {
+              callbacks: {
+                label: ctx => {
+                  const d = ctx.raw;
+                  return ` ${ctx.dataset.label}  score=${fmtScore(d.y)}  dur=${d.x}ms  (${sha7(d._commit)}@${d._branch})`;
+                },
+              },
+            },
+          },
+          scales: {
+            x: {
+              title: { display: true, text: 'Duration (ms)', color: '#8b949e', font: { size: 11 } },
+              ticks: { color: '#8b949e', font: { size: 10 } },
+              grid: { color: '#21262d' },
+            },
+            y: {
+              title: { display: true, text: 'Score', color: '#8b949e', font: { size: 11 } },
+              ticks: { color: '#8b949e', font: { size: 10 } },
+              grid: { color: '#21262d' },
+            },
+          },
+        },
+      });
+    }
+
+    // --- Main ---
+
+    async function main() {
+      document.getElementById('meta').textContent = 'Loading history…';
+
+      let records;
+      try {
+        records = await loadHistory();
+      } catch (e) {
+        document.getElementById('meta').textContent = `Error: ${e.message}`;
+        document.getElementById('main').innerHTML = `<div class="empty-state">Could not load history.jsonl.<br>Make sure GitHub Pages is enabled and a CI run has completed.</div>`;
+        return;
+      }
+
+      const bests = computeBests(records);
+      const latestTs = records.length ? fmtDate(records[records.length - 1].timestamp) : '—';
+      document.getElementById('meta').textContent =
+        `${records.length} run${records.length !== 1 ? 's' : ''} · last: ${latestTs}`;
+
+      const tabDefs = [
+        { id: 'overview', label: 'Overview' },
+        ...PROBLEMS.map(p => ({ id: p.id, label: p.label })),
+      ];
+      buildTabs(tabDefs);
+
+      tabs['overview'].render = () => renderOverview(records, bests, tabs['overview'].div);
+      for (const prob of PROBLEMS) {
+        const t = tabs[prob.id];
+        t.render = () => renderProblem(prob, records, t.div);
+      }
+
+      switchTab('overview');
+    }
+
+    main();
+  </script>
+</body>
+</html>
