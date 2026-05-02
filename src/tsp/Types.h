@@ -3,6 +3,8 @@
 #include <chrono>
 #include <vector>
 
+#include "helpers/Time.h"
+
 namespace tsp {
 
 struct Point {
@@ -15,6 +17,13 @@ inline double distance(Point x, Point y) {
   const double dy = static_cast<double>(x.y) - static_cast<double>(y.y);
 
   return std::sqrt(dx * dx + dy * dy);
+}
+
+inline double distance_sqr(Point x, Point y) {
+  const double dx = static_cast<double>(x.x) - static_cast<double>(y.x);
+  const double dy = static_cast<double>(x.y) - static_cast<double>(y.y);
+
+  return dx * dx + dy * dy;
 }
 
 struct Problem {
@@ -56,9 +65,9 @@ struct EvaluationResult {
 };
 
 struct Statistics : EvaluationResult {
-  std::chrono::milliseconds duration;
+  timing::Duration duration;
 
-  Statistics(EvaluationResult evaluation, std::chrono::milliseconds duration)
+  Statistics(EvaluationResult evaluation, timing::Duration duration)
       : EvaluationResult(evaluation), duration(duration) {}
 };
 

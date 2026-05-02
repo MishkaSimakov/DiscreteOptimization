@@ -4,6 +4,8 @@
 #include <unordered_set>
 #include <vector>
 
+#include "helpers/Time.h"
+
 namespace setcover {
 
 struct CoveringSet {
@@ -27,9 +29,9 @@ struct EvaluationResult {
 };
 
 struct Statistics : EvaluationResult {
-  std::chrono::milliseconds duration;
+  timing::Duration duration;
 
-  Statistics(EvaluationResult evaluation, std::chrono::milliseconds duration)
+  Statistics(EvaluationResult evaluation, timing::Duration duration)
       : EvaluationResult(evaluation), duration(duration) {}
 };
 

@@ -11,6 +11,7 @@
 #include <ranges>
 #include <tuple>
 
+#include "../../../cmake-build-debug/_deps/raspisator-src/src/utils/Logging.h"
 #include "ActionManager.h"
 #include "helpers/Random.h"
 #include "helpers/Time.h"
@@ -19,30 +20,52 @@ namespace annealing {
 
 // Solves minimization problem with constraints.
 // Can operate in infeasible solution spaces.
-template <typename Problem, typename Solution, typename SolutionState,
-          typename ClimateControl>
+//  - ProblemState should store the Problem and precalculated immutable problem
+// information.
+//  - SolutionState should store solution as well as some calculated
+// characteristics of it, that may be updated after action is applied.
+template <typename Problem, typename ProblemState, typename Solution,
+          typename SolutionState, typename CoolingProcess>
 class SimulatedAnnealing {
-  const Problem& problem;
+  const ProblemState problem_state;
   const timing::Deadline deadline;
 
   std::default_random_engine random_;
 
   double infeasibility_coef_;
-  ClimateControl climate_;
 
   struct ActionType {
     std::string name;
     double weight;
-    std::function<std::optional<ActionGain>(SolutionState&)> try_apply;
+
+    // Samples random action of this type, applies it with Simulated Annealing
+    // probability model.
+    std::function<std::optional<ActionGain>(SolutionState&, double)> try_apply;
+
+    // Samples random action of this type, and returns its gain.
+    std::function<ActionGain(SolutionState&)> get_gain;
   };
 
   std::vector<ActionType> actions_;
 
+  struct ActionTypeStats {
+    size_t proposed_transitions{0};
+    size_t accepted_transitions{0};
+
+    double get_acceptance_rate() const {
+      return static_cast<double>(accepted_transitions) /
+             static_cast<double>(proposed_transitions);
+    }
+  };
+
+  std::vector<ActionTypeStats> actions_stats_;
+
   // Tries to apply given action to current solution state.
   // If successfully applied, returns gain and infeasibility gain. Otherwise,
   // returns std::nullopt.
-  template <ActionManager<Problem, SolutionState> M>
-  std::optional<ActionGain> try_apply(M& manager, SolutionState& state) {
+  template <ActionManager<ProblemState, SolutionState> M>
+  std::optional<ActionGain> try_apply(M& manager, SolutionState& state,
+                                      double temperature) {
     std::uniform_real_distribution<double> prob(0, 1);
 
     const typename M::Action action = manager.generate(std::as_const(state));
@@ -51,13 +74,12 @@ class SimulatedAnnealing {
         manager.get_gain(std::as_const(state), std::as_const(action));
 
     const double combined_gain =
-        gain.score_gain + gain.infeasibility_gain * infeasibility_coef_;
+        gain.score + gain.infeasibility * infeasibility_coef_;
 
     // accept using simulated annealing algorithm
     if (combined_gain > 0 ||
-        std::exp(combined_gain / climate_.get_temperature()) > prob(random_)) {
+        std::exp(combined_gain / temperature) > prob(random_)) {
       manager.apply_action(state, std::move(action));
-      ++state.changes_count;
 
       return gain;
     }
@@ -65,18 +87,25 @@ class SimulatedAnnealing {
     return std::nullopt;
   }
 
+  template <ActionManager<ProblemState, SolutionState> M>
+  ActionGain get_gain(M& manager, SolutionState& state) {
+    const typename M::Action action = manager.generate(std::as_const(state));
+
+    return manager.get_gain(std::as_const(state), std::as_const(action));
+  }
+
   double get_total_actions_weight() const {
     double result = 0;
 
-    for (const double weight : actions_ | std::views::elements<1>) {
-      result += weight;
+    for (const ActionType& action : actions_) {
+      result += action.weight;
     }
 
     return result;
   }
 
-  // Returns index of the chosen action.
-  size_t get_random_action() {
+  // Returns index of the chosen action type.
+  size_t get_random_action_type() {
     const double total_weight = get_total_actions_weight();
 
     std::uniform_real_distribution<double> prob(0, 1);
@@ -93,140 +122,226 @@ class SimulatedAnnealing {
     std::unreachable();
   }
 
+  static void assert_score_validity([[maybe_unused]] const SolutionState& state,
+                                    [[maybe_unused]] double score,
+                                    [[maybe_unused]] double infeasibility) {
+#ifndef NDEBUG
+    const double real_score =
+        get_score(problem_state.get_problem(), state.get_solution());
+    assert(std::abs(real_score - score) < 1e-3);
+
+    const double real_infeasibility =
+        get_infeasibility(problem_state.get_problem(), state.get_solution());
+    assert(std::abs(real_infeasibility - infeasibility) < 1e-3);
+#endif
+  }
+
  public:
   explicit SimulatedAnnealing(const Problem& problem, timing::Deadline deadline)
-      : problem(problem), deadline(deadline) {}
+      : problem_state(problem), deadline(deadline) {}
 
-  template <ActionManager<Problem, SolutionState> M>
+  template <ActionManager<ProblemState, SolutionState> M>
   void add(const std::string& name, double weight) {
     ActionType action{
         .name = name,
         .weight = weight,
         .try_apply =
-            [&, manager = M(problem)](SolutionState& state) mutable {
-              return try_apply(manager, state);
+            [&, manager = M(problem_state)](SolutionState& state,
+                                            double temperature) mutable {
+              return try_apply(manager, state, temperature);
+            },
+        .get_gain =
+            [&, manager = M(problem_state)](SolutionState& state) mutable {
+              return get_gain(manager, state);
             },
     };
 
     actions_.push_back(std::move(action));
   }
 
-  Solution solve(const Solution& initial_solution) {
+  Solution solve(const Solution& initial_solution, CoolingProcess cooling) {
     if (actions_.empty()) {
       throw std::runtime_error("No actions are available.");
     }
 
-    SolutionState state(problem, initial_solution);
-    double current_cost = get_score(problem, initial_solution);
-    double current_infeasibility = get_infeasibility(problem, initial_solution);
+    std::ofstream os(paths::log(std::format(
+        "cooling_{}.csv",
+        std::chrono::steady_clock::now().time_since_epoch().count())));
+
+    // reset actions statistics
+    actions_stats_ = std::vector<ActionTypeStats>(actions_.size());
+
+    SolutionState state(std::as_const(problem_state), initial_solution);
+    double current_score =
+        get_score(problem_state.get_problem(), initial_solution);
+    double current_infeasibility =
+        get_infeasibility(problem_state.get_problem(), initial_solution);
 
     Solution best_solution = initial_solution;
-    double best_cost = current_cost;
+    double best_score = current_score;
 
     constexpr double base_infeasibility_coef_value = 50;
     infeasibility_coef_ = base_infeasibility_coef_value;
 
     double integral_infeasibility_component = 0;
 
-    size_t iterations_until_change = 10;
+    size_t iterations_per_temperature = 100;
+    size_t iterations_until_change = iterations_per_temperature;
 
-    // time in nanoseconds
-    ArithmeticMean<double> average_iteration_time;
+    using Duration = std::chrono::duration<double, std::nano>;
+    using Clock = std::chrono::steady_clock;
 
-    // for each action name stores (total count, successful count)
-    std::vector<std::pair<size_t, size_t>> actions_stats(actions_.size(),
-                                                         {0, 0});
+    auto iteration_start = Clock::now();
 
-    while (temperature_ > 1e-20) {
-      auto iteration_duration = timing::timeit([&] {
-        const size_t chosen_action = get_random_action();
+    size_t current_iteration = 0;
 
-        std::optional<ActionGain> gain =
-            actions_[chosen_action].try_apply(state);
+    while (true) {
+      const size_t chosen_action = get_random_action_type();
 
-        ++actions_stats[chosen_action].first;
-        if (gain) {
-          ++actions_stats[chosen_action].second;
+      const std::optional<ActionGain> gain =
+          actions_[chosen_action].try_apply(state, cooling.get_temperature());
 
-          current_cost -= gain->score_gain;
-          current_infeasibility -= gain->infeasibility_gain;
+      ++actions_stats_[chosen_action].proposed_transitions;
+      if (gain) {
+        ++actions_stats_[chosen_action].accepted_transitions;
 
-          if (current_infeasibility == 0) {
-            integral_infeasibility_component = 0;
-          } else {
-            integral_infeasibility_component += current_infeasibility;
-          }
+        current_score -= gain->score;
+        current_infeasibility -= gain->infeasibility;
 
-          infeasibility_coef_ =
-              base_infeasibility_coef_value *
-              std::exp(0.001 * (current_infeasibility +
-                                integral_infeasibility_component));
-
-          infeasibility_coef_ = std::min(1e6, infeasibility_coef_);
-
-          assert(std::abs(get_score(problem, state.solution) - current_cost) <
-                 1e-3);
-          assert(std::abs(get_infeasibility(problem, state.solution) -
-                          current_infeasibility) < 1e-3);
-
-          if (current_cost < best_cost && current_infeasibility == 0) {
-            std::println("  [!] new best: {}", current_cost);
-
-            best_cost = current_cost;
-            best_solution = state.solution;
-          }
+        if (current_infeasibility == 0) {
+          integral_infeasibility_component = 0;
+        } else {
+          integral_infeasibility_component += current_infeasibility;
         }
-      });
 
-      average_iteration_time.record(
-          static_cast<double>(iteration_duration.count()));
+        infeasibility_coef_ =
+            base_infeasibility_coef_value *
+            std::exp(0.001 * (current_infeasibility +
+                              integral_infeasibility_component));
+
+        infeasibility_coef_ = std::min(1e6, infeasibility_coef_);
+
+        // Score and infeasibility are updated incrementally.
+        // If any action contains error in gain calculation, all further
+        // actions will with incorrect score.
+        // In debug, we are better off checking that the score remains valid.
+        assert_score_validity(state, current_score, current_infeasibility);
+
+        if (current_score < best_score && current_infeasibility == 0) {
+          std::println("  [!] new best: {}", current_score);
+
+          best_score = current_score;
+          best_solution = state.get_solution();
+        }
+      }
 
       if (iterations_until_change == 0) {
-        climate_.advance();
+        const auto remaining_temperatures = cooling.advance();
 
-        const size_t remaining_temperature_changes =
-            static_cast<size_t>(temperature_ / delta);
-
-        const size_t remaining_nanoseconds =
-            std::chrono::duration_cast<std::chrono::nanoseconds>(
-                deadline.remaining_time())
-                .count();
-
-        if (remaining_nanoseconds == 0 || remaining_temperature_changes == 0) {
+        if (!remaining_temperatures) {
           break;
         }
 
-        const size_t nanoseconds_per_iteration =
-            static_cast<size_t>(average_iteration_time.mean());
+        const auto now = Clock::now();
 
-        iterations_until_change = remaining_nanoseconds /
-                                  nanoseconds_per_iteration /
-                                  remaining_temperature_changes;
+        const Duration remaining_time =
+            std::chrono::duration_cast<Duration>(deadline.remaining_time());
+        const Duration average_iteration_time =
+            Duration(now - iteration_start) / iterations_per_temperature;
+
+        if (remaining_time < std::chrono::milliseconds{100}) {
+          break;
+        }
+
+        iterations_until_change = iterations_per_temperature =
+            remaining_time / average_iteration_time / *remaining_temperatures;
+
+        iteration_start = now;
 
         std::println(
-            "  # iterations = {} (average itr time = {} ns), score = {}, inf = "
+            "  # iterations = {} (average itr time = {} ns), score = {}, "
+            "inf = "
             "{}, coef = "
-            "{}, T = {}, opened count = {}",
-            iterations_until_change, average_iteration_time.mean(),
-            current_cost, current_infeasibility, infeasibility_coef_,
-            temperature_, state.opened.size());
+            "{}, T = {}",
+            iterations_until_change, average_iteration_time, current_score,
+            current_infeasibility, infeasibility_coef_,
+            cooling.get_temperature());
+      }
+
+      if (current_iteration % 100'000 == 0) {
+        std::println(os, "{},{}", current_score, cooling.get_temperature());
       }
 
       --iterations_until_change;
 
-      if (deadline.is_over()) {
-        break;
+      ++current_iteration;
+    }
+
+    std::println("  global acceptance rates:");
+    for (size_t i = 0; i < actions_.size(); ++i) {
+      std::println("  - {}: {} (accepted: {}, proposed: {})", actions_[i].name,
+                   actions_stats_[i].get_acceptance_rate(),
+                   actions_stats_[i].accepted_transitions,
+                   actions_stats_[i].proposed_transitions);
+    }
+
+    return best_solution;
+  }
+
+  // Randomly samples actions, and measures gain by applying them to @solution.
+  // Returns temperature for which expected value of acceptance rate is 0.5.
+  // Ignores infeasibility gain.
+  double estimate_start_temperature(size_t samples, const Solution& solution) {
+    if (actions_.empty()) {
+      throw std::runtime_error("No actions are available.");
+    }
+
+    SolutionState state(std::as_const(problem_state), solution);
+
+    std::vector<double> alphas(samples);
+    for (size_t i = 0; i < samples; ++i) {
+      const size_t action_type = get_random_action_type();
+
+      const ActionGain gain = actions_[action_type].get_gain(state);
+
+      alphas[i] = std::min(gain.score, 0.);
+    }
+
+    // If all values are \approx 0, then
+    if (std::ranges::all_of(
+            alphas, [](double value) { return std::abs(value) < 1e-10; })) {
+      std::cerr << "Warning: all gains were positive. This smells fishy."
+                << std::endl;
+
+      return 1.;
+    }
+
+    // use binary search to find starting temperature
+    constexpr double tolerance = 1e-5;
+
+    double left = 0;
+    double right = 1e10;
+
+    while (right - left > tolerance) {
+      double middle = (left + right) / 2;
+      double acceptance = 0;
+
+      for (size_t i = 0; i < samples; ++i) {
+        acceptance += std::exp(alphas[i] / middle);
+      }
+
+      acceptance /= static_cast<double>(samples);
+
+      if (acceptance > 0.5) {
+        // decrease temperature
+        right = middle;
+      } else {
+        // increase temperature
+        left = middle;
       }
     }
 
-    std::println("  actions stats:");
-    for (const auto& name : actions_ | std::views::elements<0>) {
-      std::println("  {}: {} (out of {})", name, actions_stats[name].second,
-                   actions_stats[name].first);
-    }
-    std::println("  T_end = {}, delta = {}", temperature_, delta);
-
-    return best_solution;
+    return (left + right) / 2;
   }
 };
 

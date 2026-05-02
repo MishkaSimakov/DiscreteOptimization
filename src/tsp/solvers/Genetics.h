@@ -2,6 +2,7 @@
 
 #include <random>
 
+#include "Greedy.h"
 #include "LocalSearch2opt.h"
 #include "helpers/Random.h"
 #include "helpers/Time.h"
@@ -31,52 +32,6 @@ class Genetics {
 
   Improver improver_;
   std::default_random_engine random_;
-
-  Solution get_initial_individual() {
-    const size_t n = problem.points.size();
-
-    std::vector<size_t> next(n, -1);
-    const size_t start = rnd::index(n, random_);
-    size_t current = start;
-
-    for (size_t i = 0; i < n - 1; ++i) {
-      // choose closest to the current
-      ArgMinimum<double> closest;
-
-      // first go through candidates
-      for (const size_t j : candidates[current]) {
-        if (j == current || next[j] != -1) {
-          continue;
-        }
-
-        closest.record(j, distance(problem.points[current], problem.points[j]));
-      }
-
-      if (closest.argmin()) {
-        next[current] = *closest.argmin();
-        current = next[current];
-
-        continue;
-      }
-
-      // if failed to find node among candidates, perform full search
-      for (size_t j = 0; j < n; ++j) {
-        if (j == current || next[j] != -1) {
-          continue;
-        }
-
-        closest.record(j, distance(problem.points[current], problem.points[j]));
-      }
-
-      assert(closest.argmin().has_value());
-      next[current] = *closest.argmin();
-      current = next[current];
-    }
-
-    next[current] = start;
-
-    return Solution{next};
-  }
 
   static void reverse(std::vector<size_t>& next, const size_t from,
                       const size_t to) {
@@ -145,9 +100,7 @@ class Genetics {
             j, distance(problem.points[node], problem.points[fragments[j]]));
       }
 
-      assert(min_distance.argmin().has_value());
-
-      size_t next = *min_distance.argmin();
+      size_t next = min_distance->index;
       if (next % 2 == 0) {
         // simple case: fragment end -> start
       } else {
@@ -204,9 +157,7 @@ class Genetics {
             j, distance(problem.points[node], problem.points[fragments[j]]));
       }
 
-      assert(min_distance.argmin().has_value());
-
-      size_t next = *min_distance.argmin();
+      size_t next = min_distance->index;
       if (next % 2 == 1) {
         // simple case: fragment end -> start
       } else {
@@ -368,7 +319,7 @@ class Genetics {
       const std::vector<std::pair<double, TourStorage<>>>& population) const {
     double best_score = 1e10;  // infinity
 
-    ArgMinimum<double> closest;
+    ArgMinimum<size_t> closest;
 
     for (size_t i = 0; i < population.size(); ++i) {
       best_score = std::min(best_score, population[i].first);
@@ -376,15 +327,13 @@ class Genetics {
       closest.record(i, distance(child.second, population[i].second));
     }
 
-    logging::log_value(*closest.min(), "closest_distance.csv");
+    logging::log_value(closest->min, "closest_distance.csv");
 
-    if (*closest.min() < params.similarity_replacement_threshold) {
+    if (closest->min < params.similarity_replacement_threshold) {
       // similarity-based replacement
-      size_t closest_index = *closest.argmin();
-
-      if (std::abs(population[closest_index].first - best_score) > 1e-10 ||
-          child.first < population[closest_index].first) {
-        return closest_index;
+      if (std::abs(population[closest->index].first - best_score) > 1e-10 ||
+          child.first < population[closest->index].first) {
+        return closest->index;
       }
     }
 
@@ -394,7 +343,7 @@ class Genetics {
       worst.record(i, population[i].first);
     }
 
-    return *worst.argmax();
+    return worst->index;
   }
 
  public:
@@ -407,12 +356,13 @@ class Genetics {
         improver_(problem, candidates) {}
 
   Solution solve() {
+    Greedy greedy(problem);
     std::vector<std::pair<double, TourStorage<>>> population;
 
     // auto start = std::chrono::steady_clock::now();
 
     for (size_t i = 0; i < params.population_size; ++i) {
-      auto individual = TourStorage(get_initial_individual());
+      auto individual = TourStorage(greedy.solve());
       auto improved = improver_.solve(std::move(individual));
 
       double score = get_score(problem, improved);
@@ -420,9 +370,9 @@ class Genetics {
       population.emplace_back(score, std::move(improved));
 
       // std::println("  average: {}",
-                   // static_cast<double>(
-                       // (std::chrono::steady_clock::now() - start).count()) /
-                       // (i + 1));
+      // static_cast<double>(
+      // (std::chrono::steady_clock::now() - start).count()) /
+      // (i + 1));
     }
 
     size_t iteration = 0;
@@ -448,8 +398,8 @@ class Genetics {
 
       const double child_score = get_score(problem, child);
 
-      // std::println("{} + {} = {}", population[p1].first, population[p2].first,
-                   // child_score);
+      // std::println("{} + {} = {}", population[p1].first,
+      // population[p2].first, child_score);
 
       // replacement scheme
       std::pair replacement = {child_score, std::move(child)};
@@ -468,18 +418,8 @@ class Genetics {
       best.record(i, population[i].first);
     }
 
-    return population[*best.argmin()].second.to_solution();
+    return population[best->index].second.to_solution();
   }
 };
 
 }  // namespace tsp
-
-// solving tsp_33810_1, #points = 33810 (5)
-// total iterations: 107
-//   score: 71289523.38677187
-
-// total iterations: 98 (10)
-//   score: 71134082.40427227
-
-// total iterations: 87 (15)
-// score: 71158248.75442351

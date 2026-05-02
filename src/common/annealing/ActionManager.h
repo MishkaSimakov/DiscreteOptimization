@@ -5,11 +5,11 @@
 
 namespace annealing {
 
-template <typename T, typename Problem, typename SolutionState>
+template <typename T, typename ProblemState, typename SolutionState>
 concept ActionManager =
-    requires(T manager, const Problem& problem, SolutionState state,
+    requires(T manager, const ProblemState& problem_state, SolutionState state,
              typename T::Action action) {
-      T(problem);
+      T(problem_state);
 
       {
         manager.generate(std::as_const(state))
