@@ -1,11 +1,17 @@
 #include <print>
 
 #include "Output.h"
+#include "common/annealing/GeometricCooling.h"
+#include "common/annealing/SimulatedAnnealing.h"
 #include "helpers/Files.h"
 #include "helpers/Time.h"
 #include "solvers/Genetics.h"
 #include "solvers/Greedy.h"
 #include "solvers/LocalSearch2opt.h"
+#include "solvers/LocalSearch3opt.h"
+#include "solvers/annealing/ProblemState.h"
+#include "solvers/annealing/SolutionState.h"
+#include "solvers/annealing/TwoOptAction.h"
 #include "tsp/Evaluator.h"
 #include "tsp/Reader.h"
 
@@ -13,16 +19,27 @@ using namespace std::chrono_literals;
 using namespace tsp;
 
 Solution solve(const Problem& problem) {
-  constexpr GeneticsParams params{
-      .population_size = 50,
-      .mutation_rate = 0.2,
-      .log = false,
-    .similarity_replacement_threshold = 5,
-  };
+  const auto initial_solution = Greedy(problem).solve();
 
-  return Genetics<LocalSearch2opt>(timing::Deadline::after(10min), problem,
-                                   params)
-      .solve();
+  const auto deadline = timing::Deadline::after(10min);
+  auto annealing =
+      annealing::SimulatedAnnealing<Problem, ProblemState, Solution,
+                                    SolutionState, annealing::GeometricCooling>(
+          problem, deadline);
+
+  annealing.add<TwoOptActionManager>("2opt", 1);
+
+  const double start_temperature =
+      annealing.estimate_start_temperature(100'000, 0.3, initial_solution);
+
+  const auto sa_solution = annealing.solve(
+      initial_solution,
+      annealing::GeometricCooling(start_temperature, 0.96, 100));
+
+  std::println("{} -> {}", get_score(problem, initial_solution),
+               get_score(problem, sa_solution));
+
+  return sa_solution;
 }
 
 int main(int argc, char** argv) {

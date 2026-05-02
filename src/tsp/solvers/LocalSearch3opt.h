@@ -140,21 +140,3 @@ class LocalSearch3opt {
 
 }  // namespace tsp
 
-// solving tsp_51_1, #points = 51
-//   score: 506.36316536284625
-//   score: 451.25763690264796
-// solving tsp_100_3, #points = 100
-//   score: 25138.785452772314
-//   score: 21715.285071564685
-// solving tsp_200_2, #points = 200
-//   score: 36226.221438141445
-//   score: 32747.941928085587
-// solving tsp_574_1, #points = 574
-//   score: 47963.43948542793
-//   score: 42638.165981231585
-// solving tsp_1889_1, #points = 1889
-//   score: 391470.44549188897
-//   score: 362255.66837657226
-// solving tsp_33810_1, #points = 33810
-//   score: 78478867.03022262
-//   score: 72558326.50541551

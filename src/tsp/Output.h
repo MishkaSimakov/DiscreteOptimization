@@ -40,7 +40,9 @@ class Output {
 
     nlohmann::json json = {
         {"score", statistics.score},
-        {"duration", statistics.duration.count()},
+        {"duration", std::chrono::duration_cast<std::chrono::milliseconds>(
+                         statistics.duration)
+                         .count()},
     };
 
     os << json.dump();
