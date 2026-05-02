@@ -18,40 +18,30 @@ using namespace std::chrono_literals;
 using namespace tsp;
 
 Solution solve(const Problem& problem) {
-  auto greedy = Greedy(problem);
+  const auto initial_solution = Greedy(problem).solve();
 
-  std::optional<Solution> best_solution;
+  const auto deadline = timing::Deadline::after(10min);
+  auto annealing =
+      annealing::SimulatedAnnealing<Problem, ProblemState, Solution,
+                                    SolutionState, annealing::GeometricCooling>(
+          problem, deadline);
 
-  // 10 x 1min = 10min
-  constexpr size_t reruns_count = 1;
+  annealing.add<TwoOptActionManager>("2opt", 1);
 
-  for (size_t i = 0; i < reruns_count; ++i) {
-    auto initial_solution = greedy.solve();
+  const double start_temperature =
+      annealing.estimate_start_temperature(100'000, 0.2, initial_solution);
 
-    const auto deadline = timing::Deadline::after(10min / reruns_count);
+  const auto sa_solution = annealing.solve(
+      initial_solution,
+      annealing::GeometricCooling(start_temperature, 0.95, 100));
 
-    auto annealing = annealing::SimulatedAnnealing<Problem, ProblemState,
-                                                   Solution, SolutionState,
-                                                   annealing::GeometricCooling>(
-        problem, deadline);
+  const auto ls_solution = LocalSearch2opt(problem).solve(sa_solution);
 
-    annealing.add<TwoOptActionManager>("2opt", 1);
+  std::println("{} -> {} -> {}", get_score(problem, initial_solution),
+               get_score(problem, sa_solution),
+               get_score(problem, ls_solution));
 
-    const double start_temperature =
-        annealing.estimate_start_temperature(100'000, 0.2, initial_solution);
-
-    const auto solution = annealing.solve(
-        initial_solution,
-        annealing::GeometricCooling(start_temperature, 0.95, 100));
-
-    if (!best_solution ||
-        get_score(problem, solution) < get_score(problem, *best_solution)) {
-      best_solution = solution;
-    }
-  }
-
-  assert(best_solution.has_value());
-  return *best_solution;
+  return ls_solution;
 }
 
 int main(int argc, char** argv) {
