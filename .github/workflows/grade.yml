@@ -158,3 +158,48 @@ jobs:
 
             echo "" >> $GITHUB_STEP_SUMMARY
           done
+
+  store-results:
+    runs-on: ubuntu-latest
+    needs: collect-artifacts
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository (for scripts)
+        uses: actions/checkout@v4
+
+      - name: Checkout dashboard-data branch
+        uses: actions/checkout@v4
+        with:
+          ref: dashboard-data
+          path: dashboard-data
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: all-results
+          path: artifacts
+        continue-on-error: true
+
+      - name: Append results to history
+        run: python3 scripts/collect_results.py
+        env:
+          ARTIFACTS_DIR: artifacts
+          OUTPUT_FILE: dashboard-data/history.jsonl
+          COMMIT: ${{ github.sha }}
+          BRANCH: ${{ github.ref_name }}
+
+      - name: Commit and push history
+        run: |
+          cd dashboard-data
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add history.jsonl
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "results: ${{ github.ref_name }}@$(echo '${{ github.sha }}' | cut -c1-7)"
+          git pull --rebase origin dashboard-data
+          git push origin dashboard-data
