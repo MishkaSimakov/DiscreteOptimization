@@ -103,13 +103,20 @@
       font-family: monospace;
       margin-bottom: 12px;
     }
-    .chart-card canvas { display: block; }
+    .chart-wrap {
+      position: relative;
+      height: 180px;
+    }
 
     .scatter-card {
       background: #161b22;
       border: 1px solid #21262d;
       border-radius: 8px;
       padding: 16px;
+    }
+    .scatter-wrap {
+      position: relative;
+      height: 380px;
     }
 
     .empty-state {
@@ -311,13 +318,13 @@
       // Progress section
       let html = `<p class="section-label">Progress per instance</p><div class="charts-grid">`;
       for (const inst of prob.instances) {
-        html += `<div class="chart-card"><h3>${inst}</h3><canvas id="prog-${inst}" height="180"></canvas></div>`;
+        html += `<div class="chart-card"><h3>${inst}</h3><div class="chart-wrap"><canvas id="prog-${inst}"></canvas></div></div>`;
       }
       html += `</div>`;
 
       // Scatter section
       html += `<p class="section-label">Score vs duration (all runs)</p>`;
-      html += `<div class="scatter-card"><canvas id="scatter-${prob.id}" height="380"></canvas></div>`;
+      html += `<div class="scatter-card"><div class="scatter-wrap"><canvas id="scatter-${prob.id}"></canvas></div></div>`;
 
       div.innerHTML = html;
 
