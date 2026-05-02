@@ -128,7 +128,7 @@ class TabuCol {
 
     assert(clashing_count != 0);
 
-    if (!best_move.argmin()) {
+    if (!best_move.has_value()) {
       // select random clashing node and move it to random color
       size_t selected = random_() % clashing_count;
 
@@ -150,8 +150,8 @@ class TabuCol {
       }
     }
 
-    return {*best_move.argmin() / state.max_colors,
-            *best_move.argmin() % state.max_colors};
+    return {best_move->index / state.max_colors,
+            best_move->index % state.max_colors};
   }
 
  public:
@@ -201,8 +201,8 @@ class TabuCol {
 
       assert(new_color != old_color);
 
-      // std::println("    {}: {} -> {} (score: {})", node, old_color, new_color,
-                   // state.score);
+      // std::println("    {}: {} -> {} (score: {})", node, old_color,
+      // new_color, state.score);
 
       state.solution[node] = new_color;
       state.score = state.score + state.get_clash(node, new_color) -

@@ -96,17 +96,17 @@ class CoveringSetsPack {
       return 0;
     }
 
-    Minimum<double> covering_cost;
+    Minimum<double> min_covering_cost;
 
     for (const size_t set : get_sets_covering(element)) {
       if (states_[set] == SetState::DEFAULT) {
-        covering_cost.record(
+        min_covering_cost.record(
             static_cast<double>(problem_.sets[set].cost) /
             static_cast<double>(problem_.sets[set].elements.size()));
       }
     }
 
-    return covering_cost.min();
+    return *min_covering_cost;
   }
 
   // Returns all sets that are not included or excluded.

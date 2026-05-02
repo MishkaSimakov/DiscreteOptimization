@@ -1,8 +1,8 @@
 #pragma once
 
+#include <cassert>
 #include <random>
 #include <unordered_set>
-#include <cassert>
 
 #include "facility/Types.h"
 #include "utils/Accumulators.h"
@@ -43,9 +43,7 @@ class Greedy {
         min_cost.record(j, cost);
       }
 
-      assert(min_cost.argmin().has_value());
-
-      result[i] = *min_cost.argmin();
+      result[i] = min_cost->index;
       current_demand[result[i]] += problem.customers[i].demand;
     }
 

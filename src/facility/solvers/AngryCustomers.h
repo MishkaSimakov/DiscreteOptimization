@@ -34,14 +34,14 @@ class AngryCustomers {
     std::vector<size_t> closest(d);
 
     for (size_t i = 0; i < d; ++i) {
-      ArgMinimum<double, std::less<>> dist;
+      ArgMinimum<double, std::less<>> min_distance;
 
       for (size_t j = 0; j < n; ++j) {
-        dist.record(j, distance(problem.customers[i].position,
-                                problem.facilities[j].position));
+        min_distance.record(j, distance(problem.customers[i].position,
+                                        problem.facilities[j].position));
       }
 
-      closest[i] = *dist.argmin();
+      closest[i] = min_distance->index;
     }
 
     return closest;
@@ -179,8 +179,8 @@ class AngryCustomers {
         min_cost.record(j, cost);
       }
 
-      if (min_cost.argmin().has_value()) {
-        result[i] = *min_cost.argmin();
+      if (min_cost.has_value()) {
+        result[i] = min_cost->index;
         current_demand[result[i]] += problem.customers[i].demand;
 
         continue;
@@ -199,10 +199,8 @@ class AngryCustomers {
         min_cost.record(j, cost);
       }
 
-      assert(min_cost.argmin().has_value());
-
-      individual[*min_cost.argmin()] = true;
-      result[i] = *min_cost.argmin();
+      individual[min_cost->index] = true;
+      result[i] = min_cost->index;
       current_demand[result[i]] += problem.customers[i].demand;
     }
 
@@ -248,17 +246,18 @@ class AngryCustomers {
       const std::vector<std::pair<double, std::vector<bool>>>& population) {
     double best_score = 1e10;  // infinity
 
-    ArgMinimum<double> closest;
+    ArgMinimum<double> min_distance;
 
     for (size_t i = 0; i < population.size(); ++i) {
       best_score = std::min(best_score, population[i].first);
 
-      closest.record(i, get_distance(replacement.second, population[i].second));
+      min_distance.record(
+          i, get_distance(replacement.second, population[i].second));
     }
 
-    if (*closest.min() < params.similarity_replacement_threshold) {
+    if (min_distance->min < params.similarity_replacement_threshold) {
       // similarity-based replacement
-      size_t closest_index = *closest.argmin();
+      const size_t closest_index = min_distance->index;
 
       if (std::abs(population[closest_index].first - best_score) > 1e-10 ||
           replacement.first < population[closest_index].first) {
@@ -273,7 +272,7 @@ class AngryCustomers {
       worst_score.record(i, population[i].first);
     }
 
-    return *worst_score.argmax();
+    return worst_score->index;
   }
 
   static size_t get_distance(const std::vector<bool>& left,
@@ -306,13 +305,13 @@ class AngryCustomers {
 
   static double get_population_score(
       const std::vector<std::pair<double, std::vector<bool>>>& population) {
-    Minimum<double, std::less<>> score;
+    Minimum<double, std::less<>> min_score;
 
     for (const double s : population | std::views::keys) {
-      score.record(s);
+      min_score.record(s);
     }
 
-    return *score.min();
+    return *min_score;
   }
 
   std::pair<size_t, size_t> choose_parents(
@@ -430,7 +429,7 @@ class AngryCustomers {
     }
 
     auto [_, solution] =
-        grow(std::move(population[*best.argmin()].second), std::nullopt);
+        grow(std::move(population[best->index].second), std::nullopt);
     return Solution{solution};
   }
 };
