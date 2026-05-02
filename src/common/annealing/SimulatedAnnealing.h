@@ -31,17 +31,23 @@ class SimulatedAnnealing {
 
   std::default_random_engine random_;
 
+  struct SolverStateDTO {
+    SolutionState& solution;
+    double temperature;
+    double infeasibility_penalty;
+    std::default_random_engine& random;
+  };
+
   struct ActionType {
     std::string name;
     double weight;
 
     // Samples random action of this type, applies it with Simulated Annealing
     // probability model.
-    std::function<std::optional<ActionGain>(SolutionState&, double, double)>
-        try_apply;
+    std::function<std::optional<ActionGain>(SolverStateDTO)> try_apply;
 
     // Samples random action of this type, and returns its gain.
-    std::function<ActionGain(SolutionState&)> get_gain;
+    std::function<ActionGain(const SolutionState&)> get_gain;
   };
 
   std::vector<ActionType> actions_;
@@ -62,23 +68,22 @@ class SimulatedAnnealing {
   // If successfully applied, returns gain and infeasibility gain. Otherwise,
   // returns std::nullopt.
   template <ActionManager<ProblemState, SolutionState> M>
-  std::optional<ActionGain> try_apply(M& manager, SolutionState& state,
-                                      double temperature,
-                                      double infeasibility_coef) {
+  static std::optional<ActionGain> try_apply(M& manager, SolverStateDTO state) {
     std::uniform_real_distribution<double> prob(0, 1);
 
-    const typename M::Action action = manager.generate(std::as_const(state));
+    const typename M::Action action =
+        manager.generate(std::as_const(state.solution));
 
     const ActionGain gain =
-        manager.get_gain(std::as_const(state), std::as_const(action));
+        manager.get_gain(std::as_const(state.solution), std::as_const(action));
 
     const double combined_gain =
-        gain.score + gain.infeasibility * infeasibility_coef;
+        gain.score + gain.infeasibility * state.infeasibility_penalty;
 
     // accept using simulated annealing algorithm
     if (combined_gain > 0 ||
-        std::exp(combined_gain / temperature) > prob(random_)) {
-      manager.apply_action(state, std::move(action));
+        std::exp(combined_gain / state.temperature) > prob(state.random)) {
+      manager.apply_action(state.solution, std::move(action));
 
       return gain;
     }
@@ -87,10 +92,10 @@ class SimulatedAnnealing {
   }
 
   template <ActionManager<ProblemState, SolutionState> M>
-  ActionGain get_gain(M& manager, SolutionState& state) {
-    const typename M::Action action = manager.generate(std::as_const(state));
+  static ActionGain get_gain(M& manager, const SolutionState& state) {
+    const typename M::Action action = manager.generate(state);
 
-    return manager.get_gain(std::as_const(state), std::as_const(action));
+    return manager.get_gain(state, action);
   }
 
   double get_total_actions_weight() const {
@@ -141,19 +146,25 @@ class SimulatedAnnealing {
   explicit SimulatedAnnealing(const Problem& problem, timing::Deadline deadline)
       : problem_state(problem), deadline(deadline) {}
 
+  // non copyable
+  SimulatedAnnealing(const SimulatedAnnealing&) = delete;
+  SimulatedAnnealing& operator=(const SimulatedAnnealing&) = delete;
+
+  // non movable
+  SimulatedAnnealing(SimulatedAnnealing&&) = delete;
+  SimulatedAnnealing& operator=(SimulatedAnnealing&&) = delete;
+
   template <ActionManager<ProblemState, SolutionState> M>
   void add(const std::string& name, double weight) {
     ActionType action{
         .name = name,
         .weight = weight,
         .try_apply =
-            [&, manager = M(problem_state)](SolutionState& state,
-                                            double temperature,
-                                            double infeasibility_coef) mutable {
-              return try_apply(manager, state, temperature, infeasibility_coef);
+            [manager = M(problem_state)](SolverStateDTO state) mutable {
+              return try_apply(manager, state);
             },
         .get_gain =
-            [&, manager = M(problem_state)](SolutionState& state) mutable {
+            [manager = M(problem_state)](const SolutionState& state) mutable {
               return get_gain(manager, state);
             },
     };
@@ -178,8 +189,8 @@ class SimulatedAnnealing {
     Solution best_solution = initial_solution;
     double best_score = current_score;
 
-    constexpr double base_infeasibility_coef_value = 50;
-    double infeasibility_coef = base_infeasibility_coef_value;
+    constexpr double base_infeasibility_penalty = 50;
+    double infeasibility_penalty = base_infeasibility_penalty;
 
     double integral_infeasibility_component = 0;
 
@@ -194,8 +205,14 @@ class SimulatedAnnealing {
     while (true) {
       const size_t chosen_action = get_random_action_type();
 
-      const std::optional<ActionGain> gain = actions_[chosen_action].try_apply(
-          state, cooling.get_temperature(), infeasibility_coef);
+      SolverStateDTO state_dto{
+          .solution = state,
+          .temperature = cooling.get_temperature(),
+          .infeasibility_penalty = infeasibility_penalty,
+          .random = random_,
+      };
+      const std::optional<ActionGain> gain =
+          actions_[chosen_action].try_apply(state_dto);
 
       ++actions_stats_[chosen_action].proposed_transitions;
       if (gain) {
@@ -210,12 +227,12 @@ class SimulatedAnnealing {
           integral_infeasibility_component += current_infeasibility;
         }
 
-        infeasibility_coef =
-            base_infeasibility_coef_value *
+        infeasibility_penalty =
+            base_infeasibility_penalty *
             std::exp(0.001 * (current_infeasibility +
                               integral_infeasibility_component));
 
-        infeasibility_coef = std::min(1e6, infeasibility_coef);
+        infeasibility_penalty = std::min(1e6, infeasibility_penalty);
 
         // Score and infeasibility are updated incrementally.
         // If any action contains error in gain calculation, all further
@@ -249,12 +266,9 @@ class SimulatedAnnealing {
           break;
         }
 
-        if (*remaining_temperatures > 0) {
-          iterations_until_change = iterations_per_temperature =
-              remaining_time / average_iteration_time / *remaining_temperatures;
-        } else {
-          iterations_until_change = iterations_per_temperature;
-        }
+        iterations_until_change = iterations_per_temperature =
+            remaining_time / average_iteration_time /
+            (*remaining_temperatures + 1);
 
         iteration_start = now;
 
@@ -264,7 +278,7 @@ class SimulatedAnnealing {
             "{}, coef = "
             "{}, T = {}",
             iterations_until_change, average_iteration_time, current_score,
-            current_infeasibility, infeasibility_coef,
+            current_infeasibility, infeasibility_penalty,
             cooling.get_temperature());
       }
 
