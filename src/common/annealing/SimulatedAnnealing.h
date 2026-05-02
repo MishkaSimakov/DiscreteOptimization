@@ -63,8 +63,6 @@ class SimulatedAnnealing {
     }
   };
 
-  std::vector<ActionTypeStats> actions_stats_;
-
   // Tries to apply given action to current solution state.
   // If successfully applied, returns gain and infeasibility gain. Otherwise,
   // returns std::nullopt.
@@ -178,8 +176,7 @@ class SimulatedAnnealing {
       throw std::runtime_error("No actions are available.");
     }
 
-    // reset actions statistics
-    actions_stats_ = std::vector<ActionTypeStats>(actions_.size());
+    std::vector<ActionTypeStats> actions_stats(actions_.size());
 
     SolutionState state(std::as_const(problem_state), initial_solution);
     double current_score =
@@ -215,9 +212,9 @@ class SimulatedAnnealing {
       const std::optional<ActionGain> gain =
           actions_[chosen_action].try_apply(state_dto);
 
-      ++actions_stats_[chosen_action].proposed_transitions;
+      ++actions_stats[chosen_action].proposed_transitions;
       if (gain) {
-        ++actions_stats_[chosen_action].accepted_transitions;
+        ++actions_stats[chosen_action].accepted_transitions;
 
         current_score -= gain->score;
         current_infeasibility -= gain->infeasibility;
@@ -274,24 +271,27 @@ class SimulatedAnnealing {
         iteration_start = now;
 
         std::println(
-            "  # iterations = {} (average itr time = {} ns), score = {}, "
+            "  # iterations = {} (average itr time = {}), score = {}, "
             "inf = "
             "{}, coef = "
             "{}, T = {}",
             iterations_until_change, average_iteration_time, current_score,
             current_infeasibility, infeasibility_penalty,
             cooling.get_temperature());
+
+        std::println("  iteration acceptance rates:");
+        for (size_t i = 0; i < actions_.size(); ++i) {
+          std::println("  - {}: {} (accepted: {}, proposed: {})",
+                       actions_[i].name, actions_stats[i].get_acceptance_rate(),
+                       actions_stats[i].accepted_transitions,
+                       actions_stats[i].proposed_transitions);
+        }
+
+        // reset actions statistics
+        actions_stats = std::vector<ActionTypeStats>(actions_.size());
       }
 
       --iterations_until_change;
-    }
-
-    std::println("  global acceptance rates:");
-    for (size_t i = 0; i < actions_.size(); ++i) {
-      std::println("  - {}: {} (accepted: {}, proposed: {})", actions_[i].name,
-                   actions_stats_[i].get_acceptance_rate(),
-                   actions_stats_[i].accepted_transitions,
-                   actions_stats_[i].proposed_transitions);
     }
 
     return best_solution;

@@ -30,19 +30,16 @@ Solution solve(const Problem& problem) {
   annealing.add<TwoOptActionManager>("2opt", 1);
 
   const double start_temperature =
-      annealing.estimate_start_temperature(100'000, 0.2, initial_solution);
+      annealing.estimate_start_temperature(100'000, 0.3, initial_solution);
 
   const auto sa_solution = annealing.solve(
       initial_solution,
       annealing::GeometricCooling(start_temperature, 0.96, 100));
 
-  const auto ls_solution = LocalSearch3opt(problem).solve(sa_solution);
+  std::println("{} -> {}", get_score(problem, initial_solution),
+               get_score(problem, sa_solution));
 
-  std::println("{} -> {} -> {}", get_score(problem, initial_solution),
-               get_score(problem, sa_solution),
-               get_score(problem, ls_solution));
-
-  return ls_solution;
+  return sa_solution;
 }
 
 int main(int argc, char** argv) {
