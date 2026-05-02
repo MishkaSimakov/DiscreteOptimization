@@ -3,6 +3,8 @@
 #include <optional>
 #include <vector>
 
+#include "CoolingProcess.h"
+
 namespace annealing {
 
 class GeometricCooling {
@@ -37,5 +39,7 @@ class GeometricCooling {
     return temperatures_.size() - index_ - 1;
   }
 };
+
+static_assert(CoolingProcess<GeometricCooling>);
 
 }  // namespace annealing

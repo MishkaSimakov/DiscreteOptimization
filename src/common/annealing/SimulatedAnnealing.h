@@ -12,6 +12,7 @@
 #include <tuple>
 
 #include "ActionManager.h"
+#include "CoolingProcess.h"
 #include "helpers/Random.h"
 #include "helpers/Time.h"
 
@@ -24,7 +25,7 @@ namespace annealing {
 //  - SolutionState should store solution as well as some calculated
 // characteristics of it, that may be updated after action is applied.
 template <typename Problem, typename ProblemState, typename Solution,
-          typename SolutionState, typename CoolingProcess>
+          typename SolutionState, CoolingProcess C>
 class SimulatedAnnealing {
   const ProblemState problem_state;
   const timing::Deadline deadline;
@@ -172,7 +173,7 @@ class SimulatedAnnealing {
     actions_.push_back(std::move(action));
   }
 
-  Solution solve(const Solution& initial_solution, CoolingProcess cooling) {
+  Solution solve(const Solution& initial_solution, C cooling) {
     if (actions_.empty()) {
       throw std::runtime_error("No actions are available.");
     }
