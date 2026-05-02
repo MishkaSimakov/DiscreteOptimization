@@ -34,7 +34,7 @@ void solve(const std::string& problem_name) {
   auto annealing =
       annealing::SimulatedAnnealing<Problem, ProblemState, Solution,
                                     SolutionState, annealing::GeometricCooling>(
-          problem, timing::Deadline::after(10min));
+          problem, timing::Deadline::after(30s));
 
   annealing.add<TwoOptActionManager>("2opt", 1);
 
