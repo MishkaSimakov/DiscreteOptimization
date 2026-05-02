@@ -298,9 +298,11 @@ class SimulatedAnnealing {
   }
 
   // Randomly samples actions, and measures gain by applying them to @solution.
-  // Returns temperature for which expected value of acceptance rate is 0.5.
-  // Ignores infeasibility gain.
-  double estimate_start_temperature(size_t samples, const Solution& solution) {
+  // Returns temperature for which expected value of acceptance rate is
+  // @desired_rate. Ignores infeasibility gain.
+  double estimate_start_temperature(const size_t samples,
+                                    const double desired_rate,
+                                    const Solution& solution) {
     constexpr double tolerance = 1e-5;
 
     if (actions_.empty()) {
@@ -326,9 +328,10 @@ class SimulatedAnnealing {
 
     // If more than half of the gains were non-negative, then any temperature
     // would suffice
-    if (positive_gain_count * 2 >= samples) {
-      std::cerr << "Warning: more than half of the samples gave non-negative "
-                   "gain. This smells fishy."
+    if (static_cast<double>(positive_gain_count) >=
+        static_cast<double>(samples) * desired_rate) {
+      std::cerr << "Warning: too many samples gave non-negative gain. This "
+                   "smells fishy."
                 << std::endl;
       return 1.;
     }
@@ -347,7 +350,7 @@ class SimulatedAnnealing {
 
       acceptance /= static_cast<double>(samples);
 
-      if (acceptance > 0.5) {
+      if (acceptance > desired_rate) {
         // decrease temperature
         right = middle;
       } else {

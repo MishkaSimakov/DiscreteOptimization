@@ -23,18 +23,22 @@ Solution solve(const Problem& problem) {
   std::optional<Solution> best_solution;
 
   // 10 x 1min = 10min
-  for (size_t i = 0; i < 10; ++i) {
+  constexpr size_t reruns_count = 3;
+
+  for (size_t i = 0; i < reruns_count; ++i) {
     auto initial_solution = greedy.solve();
+
+    const auto deadline = timing::Deadline::after(10min / reruns_count);
 
     auto annealing = annealing::SimulatedAnnealing<Problem, ProblemState,
                                                    Solution, SolutionState,
                                                    annealing::GeometricCooling>(
-        problem, timing::Deadline::after(1min));
+        problem, deadline);
 
     annealing.add<TwoOptActionManager>("2opt", 1);
 
     const double start_temperature =
-        annealing.estimate_start_temperature(100'000, initial_solution);
+        annealing.estimate_start_temperature(100'000, 0.2, initial_solution);
 
     const auto solution = annealing.solve(
         initial_solution,

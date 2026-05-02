@@ -39,7 +39,7 @@ void solve(const std::string& problem_name) {
   annealing.add<TwoOptActionManager>("2opt", 1);
 
   const double start_temperature =
-      annealing.estimate_start_temperature(100'000, initial_solution);
+      annealing.estimate_start_temperature(100'000, 0.5, initial_solution);
 
   const auto solution = annealing.solve(
       initial_solution,

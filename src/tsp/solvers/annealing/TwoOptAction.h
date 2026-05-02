@@ -25,7 +25,8 @@ class TwoOptActionManager {
   std::default_random_engine random_;
 
  public:
-  explicit TwoOptActionManager(const ProblemState& problem) : state_(problem) {
+  explicit TwoOptActionManager(const ProblemState& problem)
+      : state_(problem) {
     static_assert(ProblemState::candidates_count > 2,
                   "If candidates count <= 2, then generate method can fail, "
                   "because all candidates are neighbours.");
