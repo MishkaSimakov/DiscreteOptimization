@@ -8,6 +8,7 @@
 #include "solvers/Genetics.h"
 #include "solvers/Greedy.h"
 #include "solvers/LocalSearch2opt.h"
+#include "solvers/LocalSearch3opt.h"
 #include "solvers/annealing/ProblemState.h"
 #include "solvers/annealing/SolutionState.h"
 #include "solvers/annealing/TwoOptAction.h"
@@ -33,9 +34,9 @@ Solution solve(const Problem& problem) {
 
   const auto sa_solution = annealing.solve(
       initial_solution,
-      annealing::GeometricCooling(start_temperature, 0.95, 100));
+      annealing::GeometricCooling(start_temperature, 0.96, 100));
 
-  const auto ls_solution = LocalSearch2opt(problem).solve(sa_solution);
+  const auto ls_solution = LocalSearch3opt(problem).solve(sa_solution);
 
   std::println("{} -> {} -> {}", get_score(problem, initial_solution),
                get_score(problem, sa_solution),
