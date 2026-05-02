@@ -148,8 +148,9 @@ class SimulatedAnnealing {
         .weight = weight,
         .try_apply =
             [&, manager = M(problem_state)](SolutionState& state,
-                                            double temperature) mutable {
-              return try_apply(manager, state, temperature);
+                                            double temperature,
+                                            double infeasibility_coef) mutable {
+              return try_apply(manager, state, temperature, infeasibility_coef);
             },
         .get_gain =
             [&, manager = M(problem_state)](SolutionState& state) mutable {
