@@ -23,7 +23,7 @@ Solution solve(const Problem& problem) {
   std::optional<Solution> best_solution;
 
   // 10 x 1min = 10min
-  constexpr size_t reruns_count = 3;
+  constexpr size_t reruns_count = 1;
 
   for (size_t i = 0; i < reruns_count; ++i) {
     auto initial_solution = greedy.solve();
