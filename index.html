@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Discrete Optimization Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.1.0/dist/chartjs-plugin-annotation.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -94,6 +95,8 @@
     tbody tr:hover td { background: #161b22; }
     td.mono { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 0.8rem; }
     td.score-best { color: #3fb950; font-weight: 600; font-family: monospace; }
+    td.score-easy { color: #ffa657; font-weight: 600; font-family: monospace; }
+    td.score-miss { color: #8b949e; font-family: monospace; }
     td.no-data { color: #8b949e; font-style: italic; }
     a { color: #58a6ff; text-decoration: none; }
     a:hover { text-decoration: underline; }
@@ -212,6 +215,25 @@
         .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     }
 
+    async function loadThresholds() {
+      try {
+        const resp = await fetch('thresholds.json');
+        if (!resp.ok) return {};
+        return await resp.json();
+      } catch (e) {
+        return {};
+      }
+    }
+
+    function thresholdClass(score, probId, inst, maximize, thresholds) {
+      const t = thresholds?.[probId]?.instances?.[inst];
+      if (!t) return 'score-best';
+      const { easy, hard } = t;
+      if (hard != null && (maximize ? score >= hard : score <= hard)) return 'score-best';
+      if (easy != null && (maximize ? score >= easy : score <= easy)) return 'score-easy';
+      return 'score-miss';
+    }
+
     function isBetter(a, b, maximize) {
       return b == null ? true : (maximize ? a > b : a < b);
     }
@@ -293,10 +315,11 @@
 
     // --- Renderers ---
 
-    function renderOverview(records, bests, div) {
+    function renderOverview(records, bests, thresholds, div) {
       let html = `<p class="section-label">All-time best scores</p>`;
       html += `<table><thead><tr>
         <th>Problem</th><th>Instance</th><th>Score</th>
+        <th>Easy</th><th>Hard</th>
         <th>Commit</th><th>Branch</th><th>Date</th>
       </tr></thead><tbody>`;
 
@@ -304,11 +327,17 @@
         for (const inst of prob.instances) {
           const key = `${prob.id}/${inst}`;
           const best = bests[key];
+          const t = thresholds?.[prob.id]?.instances?.[inst];
+          const easyDisp = t?.easy != null ? fmtScore(t.easy) : '—';
+          const hardDisp = t?.hard != null ? fmtScore(t.hard) : '—';
           if (best) {
+            const cls = thresholdClass(best.score, prob.id, inst, prob.maximize, thresholds);
             html += `<tr>
               <td>${prob.label}</td>
               <td class="mono">${inst}</td>
-              <td class="score-best">${fmtScore(best.score)}</td>
+              <td class="${cls}">${fmtScore(best.score)}</td>
+              <td class="mono">${easyDisp}</td>
+              <td class="mono">${hardDisp}</td>
               <td class="mono">${commitLink(best.commit)}</td>
               <td><span class="badge">${best.branch}</span></td>
               <td>${fmtDate(best.timestamp)}</td>
@@ -317,7 +346,7 @@
             html += `<tr>
               <td>${prob.label}</td>
               <td class="mono">${inst}</td>
-              <td class="no-data" colspan="4">no data yet</td>
+              <td class="no-data" colspan="6">no data yet</td>
             </tr>`;
           }
         }
@@ -326,7 +355,7 @@
       div.innerHTML = html;
     }
 
-    function renderProblem(prob, records, div) {
+    function renderProblem(prob, records, thresholds, div) {
       // Progress section
       let html = `<p class="section-label">Progress per instance</p><div class="charts-grid">`;
       for (const inst of prob.instances) {
@@ -346,6 +375,29 @@
         const key = `${prob.id}/${inst}`;
         const hist = historyFor(records, key);
         const color = PALETTE[i % PALETTE.length];
+        const t = thresholds?.[prob.id]?.instances?.[inst];
+
+        const annotations = {};
+        if (t?.easy != null) {
+          annotations.easyLine = {
+            type: 'line',
+            yMin: t.easy, yMax: t.easy,
+            borderColor: '#ffa657',
+            borderWidth: 1,
+            borderDash: [4, 4],
+            label: { display: true, content: 'easy', font: { size: 9 }, color: '#ffa657', position: 'start', yAdjust: -6 },
+          };
+        }
+        if (t?.hard != null) {
+          annotations.hardLine = {
+            type: 'line',
+            yMin: t.hard, yMax: t.hard,
+            borderColor: '#3fb950',
+            borderWidth: 1,
+            borderDash: [4, 4],
+            label: { display: true, content: 'hard', font: { size: 9 }, color: '#3fb950', position: 'start', yAdjust: -6 },
+          };
+        }
 
         new Chart(document.getElementById(`prog-${inst}`), {
           type: 'line',
@@ -365,6 +417,7 @@
             ...CHART_DEFAULTS,
             plugins: {
               ...CHART_DEFAULTS.plugins,
+              annotation: { annotations },
               tooltip: {
                 callbacks: {
                   title: ctx => {
@@ -439,9 +492,9 @@
     async function main() {
       document.getElementById('meta').textContent = 'Loading history…';
 
-      let records;
+      let records, thresholds;
       try {
-        records = await loadHistory();
+        [records, thresholds] = await Promise.all([loadHistory(), loadThresholds()]);
       } catch (e) {
         document.getElementById('meta').textContent = `Error: ${e.message}`;
         document.getElementById('main').innerHTML = `<div class="empty-state">Could not load history.jsonl.<br>Make sure GitHub Pages is enabled and a CI run has completed.</div>`;
@@ -459,10 +512,10 @@
       ];
       buildTabs(tabDefs);
 
-      tabs['overview'].render = () => renderOverview(records, bests, tabs['overview'].div);
+      tabs['overview'].render = () => renderOverview(records, bests, thresholds, tabs['overview'].div);
       for (const prob of PROBLEMS) {
         const t = tabs[prob.id];
-        t.render = () => renderProblem(prob, records, t.div);
+        t.render = () => renderProblem(prob, records, thresholds, t.div);
       }
 
       switchTab('overview');
