@@ -32,12 +32,10 @@ class DSatur {
         }
       }
 
-      assert(max_saturation.argmax().has_value());
-
-      size_t node = *max_saturation.argmax();
+      const size_t node = max_saturation->index;
 
       // color node using greedy coloring and update saturation
-      for (size_t adj : problem.adjacent[node]) {
+      for (const size_t adj : problem.adjacent[node]) {
         occupied[colors[adj]] = true;
       }
 
@@ -48,11 +46,11 @@ class DSatur {
         }
       }
 
-      for (size_t adj : problem.adjacent[node]) {
+      for (const size_t adj : problem.adjacent[node]) {
         occupied[colors[adj]] = false;
 
         bool is_new = true;
-        for (size_t adj_adj : problem.adjacent[adj]) {
+        for (const size_t adj_adj : problem.adjacent[adj]) {
           if (adj_adj != node && colors[adj_adj] == colors[node]) {
             is_new = false;
             break;

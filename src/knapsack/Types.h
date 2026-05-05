@@ -4,6 +4,7 @@
 #include <ranges>
 #include <vector>
 
+#include "helpers/Time.h"
 #include "utils/String.h"
 
 namespace knapsack {
@@ -42,9 +43,9 @@ struct EvaluationResult {
 };
 
 struct Statistics : EvaluationResult {
-  std::chrono::milliseconds duration;
+  timing::Duration duration;
 
-  Statistics(EvaluationResult evaluation, std::chrono::milliseconds duration)
+  Statistics(EvaluationResult evaluation, timing::Duration duration)
       : EvaluationResult(evaluation), duration(duration) {}
 };
 
