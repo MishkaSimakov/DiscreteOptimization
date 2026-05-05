@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "helpers/Geometry.h"
+#include "helpers/Time.h"
 
 namespace vrp {
 
@@ -35,9 +36,9 @@ struct EvaluationResult {
 };
 
 struct Statistics : EvaluationResult {
-  std::chrono::milliseconds duration;
+  timing::Duration duration;
 
-  Statistics(EvaluationResult evaluation, std::chrono::milliseconds duration)
+  Statistics(EvaluationResult evaluation, timing::Duration duration)
       : EvaluationResult(evaluation), duration(duration) {}
 };
 
