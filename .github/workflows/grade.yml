@@ -166,6 +166,7 @@ jobs:
             maximize=$(jq -r --arg t "$full" '.[$t].maximize // false' data/thresholds.json 2>/dev/null || echo false)
 
             echo "### $full" >> $GITHUB_STEP_SUMMARY
+            echo "[Compare](https://mishkasimakov.github.io/DiscreteOptimization/compare.html?commit=${GITHUB_SHA::7}&problem=$full)" >> $GITHUB_STEP_SUMMARY
             echo "| Instance | Score | Easy | Hard | Status | Duration (ms) |" >> $GITHUB_STEP_SUMMARY
             echo "|----------|-------|------|------|--------|---------------|" >> $GITHUB_STEP_SUMMARY
 
