@@ -268,6 +268,16 @@
     let allBests = {};
     let barChart = null;
 
+    function firstProblemWithResults(commitSha) {
+      for (const p of PROBLEMS) {
+        const hasAny = p.instances.some(inst =>
+          allRecords.some(r => r.commit === commitSha && r.results?.[`${p.id}/${inst}`] != null)
+        );
+        if (hasAny) return p.id;
+      }
+      return PROBLEMS[0].id;
+    }
+
     function render() {
       const commitSha = document.getElementById('sel-commit').value;
       const problemId = document.getElementById('sel-problem').value;
@@ -331,6 +341,11 @@
       }
 
       document.getElementById('content').innerHTML = html;
+
+      const url = new URL(window.location.href);
+      url.searchParams.set('commit', sha7(commitSha));
+      url.searchParams.set('problem', problemId);
+      history.replaceState(null, '', url);
 
       if (anyRun && chartLabels.length > 0) {
         const canvas = document.createElement('canvas');
@@ -403,14 +418,7 @@
       document.getElementById('meta').textContent =
         `${records.length} run${records.length !== 1 ? 's' : ''} · last: ${latestTs}`;
 
-      const probSel = document.getElementById('sel-problem');
-      for (const p of PROBLEMS) {
-        const opt = document.createElement('option');
-        opt.value = p.id;
-        opt.textContent = p.label;
-        probSel.appendChild(opt);
-      }
-      probSel.value = 'tsp';
+      const params = new URLSearchParams(window.location.search);
 
       const commitSel = document.getElementById('sel-commit');
       for (const r of uniqueCommitsNewestFirst(records)) {
@@ -418,6 +426,25 @@
         opt.value = r.commit;
         opt.textContent = `${sha7(r.commit)} · ${r.branch} · ${fmtDate(r.timestamp)}`;
         commitSel.appendChild(opt);
+      }
+      const paramCommit = params.get('commit');
+      if (paramCommit) {
+        const match = Array.from(commitSel.options).find(o => o.value.startsWith(paramCommit));
+        if (match) commitSel.value = match.value;
+      }
+
+      const probSel = document.getElementById('sel-problem');
+      for (const p of PROBLEMS) {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.label;
+        probSel.appendChild(opt);
+      }
+      const paramProblem = params.get('problem');
+      if (paramProblem && PROBLEMS.some(p => p.id === paramProblem)) {
+        probSel.value = paramProblem;
+      } else {
+        probSel.value = firstProblemWithResults(commitSel.value);
       }
 
       commitSel.addEventListener('change', render);
