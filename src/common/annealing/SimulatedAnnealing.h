@@ -172,6 +172,15 @@ class SimulatedAnnealing {
     actions_.push_back(std::move(action));
   }
 
+  struct BestSolution {
+    Solution solution;
+    double score;
+    double infeasibility;
+  };
+
+  // Returns the best found solution. Solutions are compared first by
+  // infeasibility, then by score.
+  // Note: returned solution may not be feasible.
   Solution solve(const Solution& initial_solution, C cooling) {
     if (actions_.empty()) {
       throw std::runtime_error("No actions are available.");
@@ -185,8 +194,11 @@ class SimulatedAnnealing {
     double current_infeasibility =
         get_infeasibility(problem_state.get_problem(), initial_solution);
 
-    Solution best_solution = initial_solution;
-    double best_score = current_score;
+    BestSolution best{
+        .solution = initial_solution,
+        .score = current_score,
+        .infeasibility = current_infeasibility,
+    };
 
     InfeasibilityController infeasibility;
 
@@ -225,11 +237,16 @@ class SimulatedAnnealing {
         // In debug, we are better off checking that the score remains valid.
         assert_score_validity(state, current_score, current_infeasibility);
 
-        if (current_score < best_score && current_infeasibility == 0) {
+        if (current_infeasibility < best.infeasibility ||
+            current_infeasibility == best.infeasibility &&
+                current_score < best.score) {
           std::println("  [!] new best: {}", current_score);
 
-          best_score = current_score;
-          best_solution = state.get_solution();
+          best = BestSolution{
+              .solution = state.get_solution(),
+              .score = current_score,
+              .infeasibility = current_infeasibility,
+          };
         }
       }
 
@@ -281,7 +298,7 @@ class SimulatedAnnealing {
       --iterations_until_change;
     }
 
-    return best_solution;
+    return best.solution;
   }
 
   // Randomly samples actions, and measures gain by applying them to @solution.
