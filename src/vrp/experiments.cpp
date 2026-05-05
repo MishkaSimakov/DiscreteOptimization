@@ -37,9 +37,10 @@ void solve(const std::string& problem_name) {
   auto annealing =
       annealing::SimulatedAnnealing<Problem, ProblemState, Solution,
                                     SolutionState, annealing::GeometricCooling>(
-          problem, timing::Deadline::after(5s));
+          problem, timing::Deadline::after(30s));
 
   annealing.add<ChangeVehicleManager>("change_vehicle", 1);
+  annealing.add<ChangeVehicleManager>("2opt", 1);
 
   const double start_temperature =
       annealing.estimate_start_temperature(100'000, 0.5, initial_solution);

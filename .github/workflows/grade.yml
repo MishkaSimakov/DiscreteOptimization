@@ -121,7 +121,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # library for parsing json
       - name: Install jq
@@ -215,10 +215,10 @@ jobs:
 
     steps:
       - name: Checkout repository (for scripts)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Checkout dashboard-data branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: dashboard-data
           path: dashboard-data
