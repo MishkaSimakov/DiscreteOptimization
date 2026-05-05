@@ -10,6 +10,7 @@ TASK_PREFIXES = {
     "gc_": "coloring",
     "tsp_": "tsp",
     "fl_": "facility",
+    "vrp_": "vrp",
 }
 
 
