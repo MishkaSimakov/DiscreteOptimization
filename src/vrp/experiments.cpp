@@ -3,9 +3,18 @@
 #include "Evaluator.h"
 #include "Output.h"
 #include "Reader.h"
+
 #include "helpers/Files.h"
 #include "helpers/Time.h"
+
 #include "solvers/Greedy.h"
+#include "solvers/Random.h"
+
+#include "common/annealing/GeometricCooling.h"
+#include "common/annealing/SimulatedAnnealing.h"
+#include "solvers/annealing/ChangeVehicle.h"
+#include "solvers/annealing/ProblemState.h"
+#include "solvers/annealing/SolutionState.h"
 
 using namespace std::chrono_literals;
 using namespace vrp;
@@ -23,7 +32,21 @@ void solve(const std::string& problem_name) {
                path.filename().string(), problem.vehicles_count,
                problem.vehicle_capacity, problem.customers.size());
 
-  auto solution = Greedy(problem).solve();
+  const auto initial_solution = Random(problem).solve();
+
+  auto annealing =
+      annealing::SimulatedAnnealing<Problem, ProblemState, Solution,
+                                    SolutionState, annealing::GeometricCooling>(
+          problem, timing::Deadline::after(5s));
+
+  annealing.add<ChangeVehicleManager>("change_vehicle", 1);
+
+  const double start_temperature =
+      annealing.estimate_start_temperature(100'000, 0.5, initial_solution);
+
+  const auto solution = annealing.solve(
+      initial_solution,
+      annealing::GeometricCooling(start_temperature, 0.95, 100));
 
   auto evaluation = evaluate(problem, solution);
   if (!evaluation.is_valid) {

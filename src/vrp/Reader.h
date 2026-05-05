@@ -21,6 +21,13 @@ inline Problem read_problem(const std::filesystem::path& path) {
 
   is >> customers_count >> vehicles_count >> vehicle_capacity;
 
+  // first point is the origin
+  --customers_count;
+
+  geom::Point<double> origin;
+  double dummy;
+  is >> dummy >> origin.x >> origin.y;
+
   std::vector<Customer> customers(customers_count);
   for (size_t i = 0; i < customers_count; ++i) {
     is >> customers[i].demand >> customers[i].position.x >>
@@ -28,6 +35,7 @@ inline Problem read_problem(const std::filesystem::path& path) {
   }
 
   return Problem{
+      .origin = origin,
       .vehicles_count = vehicles_count,
       .vehicle_capacity = vehicle_capacity,
       .customers = std::move(customers),

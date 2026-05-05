@@ -19,7 +19,7 @@ class Greedy {
 
     for (size_t i = 0; i < problem.vehicles_count; ++i) {
       size_t current_demand = 0;
-      auto current_position = Problem::origin();
+      auto current_position = problem.origin;
 
       // find the closest customer that fits
       while (true) {
@@ -41,16 +41,16 @@ class Greedy {
                                            problem.customers[j].position));
         }
 
-        if (!closest.argmin()) {
+        if (!closest.has_value()) {
           break;
         }
 
-        result[i].push_back(*closest.argmin());
+        result[i].push_back(closest->index);
 
-        current_demand += problem.customers[*closest.argmin()].demand;
-        current_position = problem.customers[*closest.argmin()].position;
+        current_demand += problem.customers[closest->index].demand;
+        current_position = problem.customers[closest->index].position;
 
-        served_customers[*closest.argmin()] = true;
+        served_customers[closest->index] = true;
       }
     }
 

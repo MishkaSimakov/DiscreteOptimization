@@ -10,9 +10,13 @@ inline double get_score(const Problem& problem, const Solution& solution) {
   double distance = 0;
 
   for (const auto& route : solution.routes) {
+    if (route.empty()) {
+      continue;
+    }
+
     distance +=
-        geom::distance(Problem::origin(), problem.customers[route[0]].position);
-    distance += geom::distance(Problem::origin(),
+        geom::distance(problem.origin, problem.customers[route[0]].position);
+    distance += geom::distance(problem.origin,
                                problem.customers[route.back()].position);
 
     for (size_t i = 0; i + 1 < route.size(); ++i) {
@@ -22,6 +26,23 @@ inline double get_score(const Problem& problem, const Solution& solution) {
   }
 
   return distance;
+}
+
+inline double get_infeasibility(const Problem& problem,
+                                const Solution& solution) {
+  double result = 0;
+
+  for (const auto& route : solution.routes) {
+    double vehicle_demand = 0;
+
+    for (const size_t customer : route) {
+      vehicle_demand += problem.customers[customer].demand;
+    }
+
+    result += std::max(0., vehicle_demand - problem.vehicle_capacity);
+  }
+
+  return result;
 }
 
 inline EvaluationResult evaluate(const Problem& problem,

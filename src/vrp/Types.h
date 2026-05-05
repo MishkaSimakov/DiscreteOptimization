@@ -14,12 +14,12 @@ struct Customer {
 };
 
 struct Problem {
+  geom::Point<double> origin;
+
   size_t vehicles_count;
   size_t vehicle_capacity;
 
   std::vector<Customer> customers;
-
-  static geom::Point<double> origin() { return {0, 0}; }
 };
 
 struct Solution {

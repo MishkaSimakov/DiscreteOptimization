@@ -13,6 +13,7 @@
 
 #include "ActionManager.h"
 #include "CoolingProcess.h"
+#include "InfeasibilityController.h"
 #include "helpers/Random.h"
 #include "helpers/Time.h"
 
@@ -187,10 +188,7 @@ class SimulatedAnnealing {
     Solution best_solution = initial_solution;
     double best_score = current_score;
 
-    constexpr double base_infeasibility_penalty = 50;
-    double infeasibility_penalty = base_infeasibility_penalty;
-
-    double integral_infeasibility_component = 0;
+    InfeasibilityController infeasibility;
 
     size_t iterations_per_temperature = 100;
     size_t iterations_until_change = iterations_per_temperature;
@@ -206,7 +204,7 @@ class SimulatedAnnealing {
       SolverStateDTO state_dto{
           .solution = state,
           .temperature = cooling.get_temperature(),
-          .infeasibility_penalty = infeasibility_penalty,
+          .infeasibility_penalty = infeasibility.get_penalty(),
           .random = random_,
       };
       const std::optional<ActionGain> gain =
@@ -219,18 +217,7 @@ class SimulatedAnnealing {
         current_score -= gain->score;
         current_infeasibility -= gain->infeasibility;
 
-        if (current_infeasibility == 0) {
-          integral_infeasibility_component = 0;
-        } else {
-          integral_infeasibility_component += current_infeasibility;
-        }
-
-        infeasibility_penalty =
-            base_infeasibility_penalty *
-            std::exp(0.001 * (current_infeasibility +
-                              integral_infeasibility_component));
-
-        infeasibility_penalty = std::min(1e6, infeasibility_penalty);
+        infeasibility.record(current_infeasibility);
 
         // Score and infeasibility are updated incrementally.
         // If any action contains error in gain calculation, all further
@@ -276,7 +263,7 @@ class SimulatedAnnealing {
             "{}, coef = "
             "{}, T = {}",
             iterations_until_change, average_iteration_time, current_score,
-            current_infeasibility, infeasibility_penalty,
+            current_infeasibility, infeasibility.get_penalty(),
             cooling.get_temperature());
 
         std::println("  iteration acceptance rates:");
