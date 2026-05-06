@@ -168,10 +168,10 @@ class SimulatedAnnealing {
     }
 
     if (best.infeasibility > 0) {
-      std::println("  [.] new best: {} (infeasibility = {})", best.score,
+      std::println("  [.] new best: {:.5f}\t(infeasibility = {})", best.score,
                    best.infeasibility);
     } else {
-      std::println("  [!] new best: {} (feasible)", best.score);
+      std::println("  [!] new best: {:.5f}\t(feasible)", best.score);
     }
   }
 

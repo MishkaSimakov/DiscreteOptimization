@@ -35,9 +35,9 @@ Solution run_annealing(const Problem& problem, const Solution& initial_solution,
   annealing.add<TwoOptManager>("2opt", 1);
 
   const double start_temperature =
-      annealing.estimate_start_temperature(100'000, 0.5, initial_solution);
+      annealing.estimate_start_temperature(100'000, 0.1, initial_solution);
 
-  const double infeasibility_penalty = start_temperature * 1.;
+  const double infeasibility_penalty = start_temperature * 0.5;
 
   return annealing.solve(
       initial_solution,
@@ -49,10 +49,9 @@ Solution solve(const Problem& problem) {
   const auto initial_solution = Random(problem).solve();
 
   const auto slightly_better =
-      run_annealing(problem, initial_solution, timing::Deadline::after(10s));
+      run_annealing(problem, initial_solution, timing::Deadline::after(5s));
 
-  return run_annealing(problem, slightly_better,
-                       timing::Deadline::after(5min - 10s));
+  return run_annealing(problem, slightly_better, timing::Deadline::after(290s));
 }
 
 int main(int argc, char** argv) {
