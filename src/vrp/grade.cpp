@@ -49,9 +49,9 @@ Solution solve(const Problem& problem) {
   const auto initial_solution = Random(problem).solve();
 
   const auto slightly_better =
-      run_annealing(problem, initial_solution, timing::Deadline::after(5s));
+      run_annealing(problem, initial_solution, timing::Deadline::after(10s));
 
-  return run_annealing(problem, slightly_better, timing::Deadline::after(290s));
+  return run_annealing(problem, slightly_better, timing::Deadline::after(500s));
 }
 
 int main(int argc, char** argv) {
