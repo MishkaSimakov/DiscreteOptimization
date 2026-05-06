@@ -14,7 +14,7 @@ class InfeasibilityController {
 
   double get_penalty() const {
     // return penalty_;
-    return 50;
+    return 1;
   }
 
   void record(const double infeasibility) {

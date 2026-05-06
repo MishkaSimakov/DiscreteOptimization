@@ -14,6 +14,7 @@
 #include "solvers/annealing/ChangeVehicle.h"
 #include "solvers/annealing/ProblemState.h"
 #include "solvers/annealing/SolutionState.h"
+#include "solvers/annealing/TwoOpt.h"
 
 using namespace std::chrono_literals;
 using namespace vrp;
@@ -24,9 +25,10 @@ Solution solve(const Problem& problem) {
   auto annealing =
       annealing::SimulatedAnnealing<Problem, ProblemState, Solution,
                                     SolutionState, annealing::GeometricCooling>(
-          problem, timing::Deadline::after(5s));
+          problem, timing::Deadline::after(60s));
 
   annealing.add<ChangeVehicleManager>("change_vehicle", 1);
+  annealing.add<TwoOptManager>("2opt", 10);
 
   const double start_temperature =
       annealing.estimate_start_temperature(100'000, 0.5, initial_solution);

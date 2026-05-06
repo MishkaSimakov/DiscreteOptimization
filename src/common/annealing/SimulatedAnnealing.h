@@ -71,11 +71,15 @@ class SimulatedAnnealing {
   static std::optional<ActionGain> try_apply(M& manager, SolverStateDTO state) {
     std::uniform_real_distribution<double> prob(0, 1);
 
-    const typename M::Action action =
+    const std::optional<typename M::Action> action =
         manager.generate(std::as_const(state.solution));
 
+    if (!action) {
+      return std::nullopt;
+    }
+
     const ActionGain gain =
-        manager.get_gain(std::as_const(state.solution), std::as_const(action));
+        manager.get_gain(std::as_const(state.solution), std::as_const(*action));
 
     const double combined_gain =
         gain.score + gain.infeasibility * state.infeasibility_penalty;
@@ -83,7 +87,7 @@ class SimulatedAnnealing {
     // accept using simulated annealing algorithm
     if (combined_gain > 0 ||
         std::exp(combined_gain / state.temperature) > prob(state.random)) {
-      manager.apply_action(state.solution, std::move(action));
+      manager.apply_action(state.solution, std::move(*action));
 
       return gain;
     }
@@ -93,9 +97,13 @@ class SimulatedAnnealing {
 
   template <ActionManager<ProblemState, SolutionState> M>
   static ActionGain get_gain(M& manager, const SolutionState& state) {
-    const typename M::Action action = manager.generate(state);
+    const std::optional<typename M::Action> action = manager.generate(state);
 
-    return manager.get_gain(state, action);
+    if (!action) {
+      return ActionGain{0, 0};
+    }
+
+    return manager.get_gain(state, *action);
   }
 
   double get_total_actions_weight() const {

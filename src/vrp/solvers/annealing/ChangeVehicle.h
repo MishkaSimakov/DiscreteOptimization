@@ -27,7 +27,7 @@ class ChangeVehicleManager {
   explicit ChangeVehicleManager(const ProblemState& problem)
       : state_(problem) {}
 
-  ChangeVehicleAction generate(const SolutionState& solution) {
+  std::optional<ChangeVehicleAction> generate(const SolutionState& solution) {
     const size_t n = state_.problem.customers.size();
 
     const size_t customer = rnd::index(n, random_);

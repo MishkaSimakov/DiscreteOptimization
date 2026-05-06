@@ -32,49 +32,54 @@ class TwoOptManager {
                   "because all candidates are neighbours.");
   }
 
-  TwoOptAction generate(const SolutionState& solution) {
+  std::optional<TwoOptAction> generate(const SolutionState& solution) {
     const size_t n = state_.problem.customers.size();
 
     const size_t t1 = rnd::index(n, random_);
-    const size_t direction = rnd::index(2, random_);
 
-    const size_t t2 = direction == 0 ? solution.customers[t1].next
-                                     : solution.customers[t1].prev;
+    const size_t vehicle = solution.customers[t1].vehicle;
+    const size_t t2 = solution.customers[t1].next;
 
     size_t count = 0;
+    size_t current = n + vehicle;
 
-    for (const size_t t3 : state_.candidates[t2]) {
-      if (solution.customers[t2].next != t3 &&
-          solution.customers[t2].prev != t3) {
+    do {
+      if (solution.customers[t2].next != current &&
+          solution.customers[t2].prev != current && t2 != current) {
         ++count;
       }
+
+      current = solution.customers[current].next;
+    } while (current != n + vehicle);
+
+    if (count == 0) {
+      return std::nullopt;
     }
 
-    assert(count > 0);
+    OnceAssigned<size_t> t3;
 
-    OnceAssigned<size_t> chosen_t3;
+    size_t t3_index = rnd::index(count, random_);
+    current = n + vehicle;
 
-    size_t chosen_t3_index = rnd::index(count, random_);
-    for (const size_t t3 : state_.candidates[t2]) {
-      if (solution.customers[t2].next != t3 &&
-          solution.customers[t2].prev != t3) {
-        continue;
+    do {
+      if (solution.customers[t2].next != current &&
+          solution.customers[t2].prev != current && t2 != current) {
+        if (t3_index == 0) {
+          t3 = current;
+          break;
+        }
+
+        --t3_index;
       }
 
-      if (chosen_t3_index == 0) {
-        chosen_t3 = t3;
-        break;
-      }
-
-      --chosen_t3_index;
-    }
+      current = solution.customers[current].next;
+    } while (current != n + vehicle);
 
     return TwoOptAction{
         .t1 = t1,
         .t2 = t2,
-        .t3 = chosen_t3,
-        .t4 = direction == 0 ? solution.customers[chosen_t3].prev
-                             : solution.customers[chosen_t3].next,
+        .t3 = t3,
+        .t4 = solution.customers[t3].prev,
     };
   }
 
@@ -94,15 +99,16 @@ class TwoOptManager {
   void apply_action(SolutionState& solution, TwoOptAction action) {
     // reverse fragment from t4 to t2
     size_t current = action.t4;
+    const size_t end = solution.customers[action.t2].prev;
 
     do {
       const auto node = solution.customers[current];
 
-      solution.customers[current].next = node.prev;
-      solution.customers[current].prev = node.next;
+      std::swap(solution.customers[current].next,
+                solution.customers[current].prev);
 
-      current = node.next;
-    } while (current != action.t2);
+      current = node.prev;
+    } while (current != end);
 
     // update links between t1, t2, t3, t4
     solution.customers[action.t1].next = action.t4;

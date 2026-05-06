@@ -14,10 +14,16 @@ struct ProblemState {
   std::vector<std::vector<size_t>> candidates;
 
   static auto get_candidates(const Problem& problem) {
-    auto points =
-        problem.customers | std::views::transform([](Customer customer) {
-          return customer.position;
-        });
+    std::vector<geom::Point<double>> points(problem.customers.size() +
+                                            problem.vehicles_count);
+
+    for (size_t i = 0; i < problem.customers.size(); ++i) {
+      points[i] = problem.customers[i].position;
+    }
+
+    for (size_t i = 0; i < problem.vehicles_count; ++i) {
+      points[problem.customers.size() + i] = problem.origin;
+    }
 
     return get_neighbors_by_distance(points, candidates_count);
   }
