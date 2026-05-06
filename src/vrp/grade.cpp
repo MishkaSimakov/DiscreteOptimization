@@ -21,19 +21,28 @@ using namespace vrp;
 
 Solution run_annealing(const Problem& problem, const Solution& initial_solution,
                        timing::Deadline deadline) {
+  constexpr annealing::SimulatedAnnealingConfig config{
+      .log_best = true,
+      .log_iteration_end = true,
+  };
+
   auto annealing =
       annealing::SimulatedAnnealing<Problem, ProblemState, Solution,
                                     SolutionState, annealing::GeometricCooling>(
-          problem, deadline);
+          problem, deadline, config);
 
   annealing.add<ChangeVehicleManager>("change_vehicle", 1);
-  annealing.add<TwoOptManager>("2opt", 10);
+  annealing.add<TwoOptManager>("2opt", 1);
 
   const double start_temperature =
       annealing.estimate_start_temperature(100'000, 0.5, initial_solution);
 
-  return annealing.solve(initial_solution, annealing::GeometricCooling(
-                                               start_temperature, 0.99, 100));
+  const double infeasibility_penalty = start_temperature * 1.;
+
+  return annealing.solve(
+      initial_solution,
+      annealing::GeometricCooling(start_temperature, 0.99, 100),
+      infeasibility_penalty);
 }
 
 Solution solve(const Problem& problem) {

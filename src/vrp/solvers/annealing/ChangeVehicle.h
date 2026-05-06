@@ -38,7 +38,7 @@ class ChangeVehicleManager {
     }
 
     // find injection_point using greedy algorithm
-    ArgMinimum<double> max_gain;
+    ArgMaximum<double> max_gain;
 
     size_t current = n + new_vehicle;
 

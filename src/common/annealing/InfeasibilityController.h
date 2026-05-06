@@ -3,30 +3,15 @@
 namespace annealing {
 
 class InfeasibilityController {
-  static constexpr double base_infeasibility_penalty = 50;
-
-  double penalty_;
-  double integral_;
+  const double penalty;
 
  public:
-  InfeasibilityController()
-      : penalty_(base_infeasibility_penalty), integral_(0) {}
+  explicit InfeasibilityController(const double infeasibility_penalty)
+      : penalty(infeasibility_penalty) {}
 
-  double get_penalty() const {
-    return penalty_;
-  }
+  double get_penalty() const { return penalty; }
 
-  void update(const double infeasibility, const double temperature) {
-    // if (infeasibility == 0) {
-    //   integral_ = 0;
-    // } else {
-    //   integral_ += infeasibility;
-    // }
-    //
-    // penalty_ = base_infeasibility_penalty * std::exp(0.001 * integral_);
-    // penalty_ = std::min(1e6, penalty_);
-    penalty_ = 100. / temperature;
-  }
+  void update(const double infeasibility, const double temperature) {}
 };
 
 }  // namespace annealing

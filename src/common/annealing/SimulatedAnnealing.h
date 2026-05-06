@@ -19,6 +19,11 @@
 
 namespace annealing {
 
+struct SimulatedAnnealingConfig {
+  bool log_best;
+  bool log_iteration_end;
+};
+
 // Solves minimization problem with constraints.
 // Can operate in infeasible solution spaces.
 //  - ProblemState should store the Problem and precalculated immutable problem
@@ -30,6 +35,7 @@ template <typename Problem, typename ProblemState, typename Solution,
 class SimulatedAnnealing {
   const ProblemState problem_state;
   const timing::Deadline deadline;
+  const SimulatedAnnealingConfig config;
 
   std::default_random_engine random_;
 
@@ -62,6 +68,12 @@ class SimulatedAnnealing {
       return static_cast<double>(accepted_transitions) /
              static_cast<double>(proposed_transitions);
     }
+  };
+
+  struct BestSolution {
+    Solution solution;
+    double score;
+    double infeasibility;
   };
 
   // Tries to apply given action to current solution state.
@@ -150,9 +162,23 @@ class SimulatedAnnealing {
 #endif
   }
 
+  void log_new_best(const BestSolution& best) const {
+    if (!config.log_best) {
+      return;
+    }
+
+    if (best.infeasibility > 0) {
+      std::println("  [.] new best: {} (infeasibility = {})", best.score,
+                   best.infeasibility);
+    } else {
+      std::println("  [!] new best: {} (feasible)", best.score);
+    }
+  }
+
  public:
-  explicit SimulatedAnnealing(const Problem& problem, timing::Deadline deadline)
-      : problem_state(problem), deadline(deadline) {}
+  explicit SimulatedAnnealing(const Problem& problem, timing::Deadline deadline,
+                              SimulatedAnnealingConfig config)
+      : problem_state(problem), deadline(deadline), config(config) {}
 
   // non copyable
   SimulatedAnnealing(const SimulatedAnnealing&) = delete;
@@ -180,16 +206,11 @@ class SimulatedAnnealing {
     actions_.push_back(std::move(action));
   }
 
-  struct BestSolution {
-    Solution solution;
-    double score;
-    double infeasibility;
-  };
-
   // Returns the best found solution. Solutions are compared first by
   // infeasibility, then by score.
   // Note: returned solution may not be feasible.
-  Solution solve(const Solution& initial_solution, C cooling) {
+  Solution solve(const Solution& initial_solution, C cooling,
+                 double infeasibility_penalty) {
     if (actions_.empty()) {
       throw std::runtime_error("No actions are available.");
     }
@@ -208,7 +229,7 @@ class SimulatedAnnealing {
         .infeasibility = current_infeasibility,
     };
 
-    InfeasibilityController infeasibility;
+    InfeasibilityController infeasibility(infeasibility_penalty);
 
     size_t iterations_per_temperature = 100;
     size_t iterations_until_change = iterations_per_temperature;
@@ -248,18 +269,13 @@ class SimulatedAnnealing {
         if (current_infeasibility < best.infeasibility ||
             current_infeasibility == best.infeasibility &&
                 current_score < best.score - 1e-5) {
-          if (current_infeasibility > 0) {
-            std::println("  [.] new best: {} (infeasibility = {})",
-                         current_score, current_infeasibility);
-          } else {
-            std::println("  [!] new best: {} (feasible)", current_score);
-          }
-
           best = BestSolution{
               .solution = state.get_solution(),
               .score = current_score,
               .infeasibility = current_infeasibility,
           };
+
+          log_new_best(best);
         }
       }
 
@@ -287,21 +303,24 @@ class SimulatedAnnealing {
 
         iteration_start = now;
 
-        std::println(
-            "  # iterations = {} (average itr time = {}), score = {}, "
-            "inf = "
-            "{}, coef = "
-            "{}, T = {}",
-            iterations_until_change, average_iteration_time, current_score,
-            current_infeasibility, infeasibility.get_penalty(),
-            cooling.get_temperature());
+        if (config.log_iteration_end) {
+          std::println(
+              "  # iterations = {} (average itr time = {}), score = {}, "
+              "inf = "
+              "{}, coef = "
+              "{}, T = {}",
+              iterations_until_change, average_iteration_time, current_score,
+              current_infeasibility, infeasibility.get_penalty(),
+              cooling.get_temperature());
 
-        std::println("  iteration acceptance rates:");
-        for (size_t i = 0; i < actions_.size(); ++i) {
-          std::println("  - {}: {} (accepted: {}, proposed: {})",
-                       actions_[i].name, actions_stats[i].get_acceptance_rate(),
-                       actions_stats[i].accepted_transitions,
-                       actions_stats[i].proposed_transitions);
+          std::println("  iteration acceptance rates:");
+          for (size_t i = 0; i < actions_.size(); ++i) {
+            std::println("  - {}: {} (accepted: {}, proposed: {})",
+                         actions_[i].name,
+                         actions_stats[i].get_acceptance_rate(),
+                         actions_stats[i].accepted_transitions,
+                         actions_stats[i].proposed_transitions);
+          }
         }
 
         // reset actions statistics
