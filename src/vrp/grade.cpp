@@ -51,7 +51,8 @@ Solution solve(const Problem& problem) {
   const auto slightly_better =
       run_annealing(problem, initial_solution, timing::Deadline::after(10s));
 
-  return run_annealing(problem, slightly_better, timing::Deadline::after(50s));
+  return run_annealing(problem, slightly_better,
+                       timing::Deadline::after(5min - 10s));
 }
 
 int main(int argc, char** argv) {
