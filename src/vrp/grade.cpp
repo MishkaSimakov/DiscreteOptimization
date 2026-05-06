@@ -19,9 +19,8 @@
 using namespace std::chrono_literals;
 using namespace vrp;
 
-Solution solve(const Problem& problem) {
-  const auto initial_solution = Random(problem).solve();
-
+Solution run_annealing(const Problem& problem, const Solution& initial_solution,
+                       timing::Deadline deadline) {
   constexpr annealing::SimulatedAnnealingConfig config{
       .log_best = true,
       .log_iteration_end = true,
@@ -30,18 +29,29 @@ Solution solve(const Problem& problem) {
   auto annealing =
       annealing::SimulatedAnnealing<Problem, ProblemState, Solution,
                                     SolutionState, annealing::GeometricCooling>(
-          problem, timing::Deadline::after(300s), config);
+          problem, deadline, config);
 
   annealing.add<ChangeVehicleManager>("change_vehicle", 1);
   annealing.add<TwoOptManager>("2opt", 1);
 
-  const double start_temperature = 5.;
-  const double infeasibility_penalty = start_temperature * 0.5;
+  const double start_temperature =
+      annealing.estimate_start_temperature(100'000, 0.5, initial_solution);
+
+  const double infeasibility_penalty = start_temperature * 1.;
 
   return annealing.solve(
       initial_solution,
       annealing::GeometricCooling(start_temperature, 0.99, 100),
       infeasibility_penalty);
+}
+
+Solution solve(const Problem& problem) {
+  const auto initial_solution = Random(problem).solve();
+
+  const auto slightly_better =
+      run_annealing(problem, initial_solution, timing::Deadline::after(10s));
+
+  return run_annealing(problem, slightly_better, timing::Deadline::after(60s));
 }
 
 int main(int argc, char** argv) {

@@ -34,3 +34,4 @@ add_experiments_target(facility)
 add_experiments_target(vrp)
 
 add_target(setcover_gridsearch setcover/grid_search.cpp)
+add_target(vrp_gridsearch vrp/grid_search.cpp)
