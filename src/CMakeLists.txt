@@ -30,3 +30,5 @@ add_experiments_target(knapsack)
 add_experiments_target(coloring)
 add_experiments_target(tsp)
 add_experiments_target(facility)
+
+add_target(setcover_gridsearch setcover/grid_search.cpp)
