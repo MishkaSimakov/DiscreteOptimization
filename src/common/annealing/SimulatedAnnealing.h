@@ -237,7 +237,7 @@ class SimulatedAnnealing {
         current_score -= gain->score;
         current_infeasibility -= gain->infeasibility;
 
-        infeasibility.record(current_infeasibility);
+        infeasibility.update(current_infeasibility, cooling.get_temperature());
 
         // Score and infeasibility are updated incrementally.
         // If any action contains error in gain calculation, all further
@@ -247,8 +247,13 @@ class SimulatedAnnealing {
 
         if (current_infeasibility < best.infeasibility ||
             current_infeasibility == best.infeasibility &&
-                current_score < best.score) {
-          std::println("  [!] new best: {}", current_score);
+                current_score < best.score - 1e-5) {
+          if (current_infeasibility > 0) {
+            std::println("  [.] new best: {} (infeasibility = {})",
+                         current_score, current_infeasibility);
+          } else {
+            std::println("  [!] new best: {} (feasible)", current_score);
+          }
 
           best = BestSolution{
               .solution = state.get_solution(),

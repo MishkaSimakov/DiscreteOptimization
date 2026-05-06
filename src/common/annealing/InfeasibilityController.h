@@ -13,19 +13,19 @@ class InfeasibilityController {
       : penalty_(base_infeasibility_penalty), integral_(0) {}
 
   double get_penalty() const {
-    // return penalty_;
-    return 1;
+    return penalty_;
   }
 
-  void record(const double infeasibility) {
-    if (infeasibility == 0) {
-      integral_ = 0;
-    } else {
-      integral_ += infeasibility;
-    }
-
-    penalty_ = base_infeasibility_penalty * std::exp(0.001 * integral_);
-    penalty_ = std::min(1e6, penalty_);
+  void update(const double infeasibility, const double temperature) {
+    // if (infeasibility == 0) {
+    //   integral_ = 0;
+    // } else {
+    //   integral_ += infeasibility;
+    // }
+    //
+    // penalty_ = base_infeasibility_penalty * std::exp(0.001 * integral_);
+    // penalty_ = std::min(1e6, penalty_);
+    penalty_ = 100. / temperature;
   }
 };
 
