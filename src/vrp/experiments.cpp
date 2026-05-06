@@ -22,8 +22,11 @@ using namespace vrp;
 
 const std::vector<std::string> graded_problems = {
     // "vrp_16_3_1",
-    // "vrp_26_8_1", "vrp_51_5_1", "vrp_101_10_1", "vrp_200_16_1",
-    "vrp_421_41_1",
+    // "vrp_26_8_1",
+    // "vrp_51_5_1",
+  // "vrp_101_10_1",
+  "vrp_200_16_1",
+    // "vrp_421_41_1",
 };
 
 Solution run_annealing(const Problem& problem, const Solution& initial_solution,
@@ -41,10 +44,11 @@ Solution run_annealing(const Problem& problem, const Solution& initial_solution,
   annealing.add<ChangeVehicleManager>("change_vehicle", 1);
   annealing.add<TwoOptManager>("2opt", 1);
 
-  const double start_temperature =
-      annealing.estimate_start_temperature(100'000, 0.5, initial_solution);
+  // const double start_temperature =
+  // annealing.estimate_start_temperature(100'000, 0.5, initial_solution);
+  const double start_temperature = 5;
 
-  const double infeasibility_penalty = start_temperature * 1.;
+  const double infeasibility_penalty = start_temperature * 0.5;
 
   return annealing.solve(
       initial_solution,
@@ -62,10 +66,10 @@ void solve(const std::string& problem_name) {
 
   const auto initial_solution = Random(problem).solve();
 
-  const auto solution1 =
-      run_annealing(problem, initial_solution, timing::Deadline::after(10s));
+  // const auto solution1 =
+  // run_annealing(problem, initial_solution, timing::Deadline::after(10s));
   const auto solution2 =
-      run_annealing(problem, solution1, timing::Deadline::after(50s));
+      run_annealing(problem, initial_solution, timing::Deadline::after(60s));
 
   auto evaluation = evaluate(problem, solution2);
   if (!evaluation.is_valid) {
