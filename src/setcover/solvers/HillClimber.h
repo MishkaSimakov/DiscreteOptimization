@@ -5,6 +5,7 @@
 
 #include "helpers/Time.h"
 #include "setcover/CoveringSetsPack.h"
+#include "setcover/Evaluator.h"
 #include "setcover/Types.h"
 
 namespace setcover {
@@ -79,7 +80,7 @@ class HillClimber {
         current_solution = std::move(new_solution);
         current_cost = cost;
 
-        std::println("  {} -> {}", current_cost, cost);
+        // std::println("  {} -> {}", current_cost, cost);
       }
 
       if (deadline.is_over()) {
