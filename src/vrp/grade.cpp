@@ -55,10 +55,10 @@ Solution solve(const Problem& problem) {
 
   const double infeasibility_penalty = start_temperature * 0.75;
 
-  const auto solution =
-      annealing.solve(initial_solution,
-                      annealing::GeometricCooling(start_temperature, 0.98, 100),
-                      infeasibility_penalty);
+  return annealing.solve(
+      initial_solution,
+      annealing::GeometricCooling(start_temperature, 0.98, 100),
+      infeasibility_penalty);
 }
 
 int main(int argc, char** argv) {
