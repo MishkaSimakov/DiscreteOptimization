@@ -13,10 +13,16 @@
 
 #include "ActionManager.h"
 #include "CoolingProcess.h"
+#include "InfeasibilityController.h"
 #include "helpers/Random.h"
 #include "helpers/Time.h"
 
 namespace annealing {
+
+struct SimulatedAnnealingConfig {
+  bool log_best;
+  bool log_iteration_end;
+};
 
 // Solves minimization problem with constraints.
 // Can operate in infeasible solution spaces.
@@ -29,6 +35,7 @@ template <typename Problem, typename ProblemState, typename Solution,
 class SimulatedAnnealing {
   const ProblemState problem_state;
   const timing::Deadline deadline;
+  const SimulatedAnnealingConfig config;
 
   std::default_random_engine random_;
 
@@ -63,6 +70,12 @@ class SimulatedAnnealing {
     }
   };
 
+  struct BestSolution {
+    Solution solution;
+    double score;
+    double infeasibility;
+  };
+
   // Tries to apply given action to current solution state.
   // If successfully applied, returns gain and infeasibility gain. Otherwise,
   // returns std::nullopt.
@@ -70,11 +83,15 @@ class SimulatedAnnealing {
   static std::optional<ActionGain> try_apply(M& manager, SolverStateDTO state) {
     std::uniform_real_distribution<double> prob(0, 1);
 
-    const typename M::Action action =
+    const std::optional<typename M::Action> action =
         manager.generate(std::as_const(state.solution));
 
+    if (!action) {
+      return std::nullopt;
+    }
+
     const ActionGain gain =
-        manager.get_gain(std::as_const(state.solution), std::as_const(action));
+        manager.get_gain(std::as_const(state.solution), std::as_const(*action));
 
     const double combined_gain =
         gain.score + gain.infeasibility * state.infeasibility_penalty;
@@ -82,7 +99,7 @@ class SimulatedAnnealing {
     // accept using simulated annealing algorithm
     if (combined_gain > 0 ||
         std::exp(combined_gain / state.temperature) > prob(state.random)) {
-      manager.apply_action(state.solution, std::move(action));
+      manager.apply_action(state.solution, std::move(*action));
 
       return gain;
     }
@@ -92,9 +109,13 @@ class SimulatedAnnealing {
 
   template <ActionManager<ProblemState, SolutionState> M>
   static ActionGain get_gain(M& manager, const SolutionState& state) {
-    const typename M::Action action = manager.generate(state);
+    const std::optional<typename M::Action> action = manager.generate(state);
 
-    return manager.get_gain(state, action);
+    if (!action) {
+      return ActionGain{0, 0};
+    }
+
+    return manager.get_gain(state, *action);
   }
 
   double get_total_actions_weight() const {
@@ -141,9 +162,23 @@ class SimulatedAnnealing {
 #endif
   }
 
+  void log_new_best(const BestSolution& best) const {
+    if (!config.log_best) {
+      return;
+    }
+
+    if (best.infeasibility > 0) {
+      std::println("  [.] new best: {:.5f}\t(infeasibility = {})", best.score,
+                   best.infeasibility);
+    } else {
+      std::println("  [!] new best: {:.5f}\t(feasible)", best.score);
+    }
+  }
+
  public:
-  explicit SimulatedAnnealing(const Problem& problem, timing::Deadline deadline)
-      : problem_state(problem), deadline(deadline) {}
+  explicit SimulatedAnnealing(const Problem& problem, timing::Deadline deadline,
+                              SimulatedAnnealingConfig config)
+      : problem_state(problem), deadline(deadline), config(config) {}
 
   // non copyable
   SimulatedAnnealing(const SimulatedAnnealing&) = delete;
@@ -171,7 +206,11 @@ class SimulatedAnnealing {
     actions_.push_back(std::move(action));
   }
 
-  Solution solve(const Solution& initial_solution, C cooling) {
+  // Returns the best found solution. Solutions are compared first by
+  // infeasibility, then by score.
+  // Note: returned solution may not be feasible.
+  Solution solve(const Solution& initial_solution, C cooling,
+                 double infeasibility_penalty) {
     if (actions_.empty()) {
       throw std::runtime_error("No actions are available.");
     }
@@ -184,13 +223,13 @@ class SimulatedAnnealing {
     double current_infeasibility =
         get_infeasibility(problem_state.get_problem(), initial_solution);
 
-    Solution best_solution = initial_solution;
-    double best_score = current_score;
+    BestSolution best{
+        .solution = initial_solution,
+        .score = current_score,
+        .infeasibility = current_infeasibility,
+    };
 
-    constexpr double base_infeasibility_penalty = 50;
-    double infeasibility_penalty = base_infeasibility_penalty;
-
-    double integral_infeasibility_component = 0;
+    InfeasibilityController infeasibility(infeasibility_penalty);
 
     size_t iterations_per_temperature = 100;
     size_t iterations_until_change = iterations_per_temperature;
@@ -206,7 +245,7 @@ class SimulatedAnnealing {
       SolverStateDTO state_dto{
           .solution = state,
           .temperature = cooling.get_temperature(),
-          .infeasibility_penalty = infeasibility_penalty,
+          .infeasibility_penalty = infeasibility.get_penalty(),
           .random = random_,
       };
       const std::optional<ActionGain> gain =
@@ -219,18 +258,7 @@ class SimulatedAnnealing {
         current_score -= gain->score;
         current_infeasibility -= gain->infeasibility;
 
-        if (current_infeasibility == 0) {
-          integral_infeasibility_component = 0;
-        } else {
-          integral_infeasibility_component += current_infeasibility;
-        }
-
-        infeasibility_penalty =
-            base_infeasibility_penalty *
-            std::exp(0.001 * (current_infeasibility +
-                              integral_infeasibility_component));
-
-        infeasibility_penalty = std::min(1e6, infeasibility_penalty);
+        infeasibility.update(current_infeasibility, cooling.get_temperature());
 
         // Score and infeasibility are updated incrementally.
         // If any action contains error in gain calculation, all further
@@ -238,11 +266,16 @@ class SimulatedAnnealing {
         // In debug, we are better off checking that the score remains valid.
         assert_score_validity(state, current_score, current_infeasibility);
 
-        if (current_score < best_score && current_infeasibility == 0) {
-          std::println("  [!] new best: {}", current_score);
+        if (current_infeasibility < best.infeasibility ||
+            current_infeasibility == best.infeasibility &&
+                current_score < best.score - 1e-5) {
+          best = BestSolution{
+              .solution = state.get_solution(),
+              .score = current_score,
+              .infeasibility = current_infeasibility,
+          };
 
-          best_score = current_score;
-          best_solution = state.get_solution();
+          log_new_best(best);
         }
       }
 
@@ -270,21 +303,24 @@ class SimulatedAnnealing {
 
         iteration_start = now;
 
-        std::println(
-            "  # iterations = {} (average itr time = {}), score = {}, "
-            "inf = "
-            "{}, coef = "
-            "{}, T = {}",
-            iterations_until_change, average_iteration_time, current_score,
-            current_infeasibility, infeasibility_penalty,
-            cooling.get_temperature());
+        if (config.log_iteration_end) {
+          std::println(
+              "  # iterations = {} (average itr time = {}), score = {}, "
+              "inf = "
+              "{}, coef = "
+              "{}, T = {}",
+              iterations_until_change, average_iteration_time, current_score,
+              current_infeasibility, infeasibility.get_penalty(),
+              cooling.get_temperature());
 
-        std::println("  iteration acceptance rates:");
-        for (size_t i = 0; i < actions_.size(); ++i) {
-          std::println("  - {}: {} (accepted: {}, proposed: {})",
-                       actions_[i].name, actions_stats[i].get_acceptance_rate(),
-                       actions_stats[i].accepted_transitions,
-                       actions_stats[i].proposed_transitions);
+          std::println("  iteration acceptance rates:");
+          for (size_t i = 0; i < actions_.size(); ++i) {
+            std::println("  - {}: {} (accepted: {}, proposed: {})",
+                         actions_[i].name,
+                         actions_stats[i].get_acceptance_rate(),
+                         actions_stats[i].accepted_transitions,
+                         actions_stats[i].proposed_transitions);
+          }
         }
 
         // reset actions statistics
@@ -294,7 +330,7 @@ class SimulatedAnnealing {
       --iterations_until_change;
     }
 
-    return best_solution;
+    return best.solution;
   }
 
   // Randomly samples actions, and measures gain by applying them to @solution.

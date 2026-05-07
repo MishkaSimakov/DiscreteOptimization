@@ -13,7 +13,7 @@ concept ActionManager =
 
       {
         manager.generate(std::as_const(state))
-      } -> std::same_as<typename T::Action>;
+      } -> std::same_as<std::optional<typename T::Action>>;
       {
         manager.get_gain(std::as_const(state), std::as_const(action))
       } -> std::same_as<ActionGain>;

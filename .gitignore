@@ -8,7 +8,7 @@ output
 grid_search/
 log
 
-# ignore all tasks except those that are graded
+# ignore all instances except those that are graded
 tasks/setcover/*
 tasks/knapsack/*
 tasks/coloring/*

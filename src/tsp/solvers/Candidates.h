@@ -17,6 +17,7 @@
 
 namespace tsp {
 
+// TODO: replace this with Neighbors.h
 inline std::vector<std::vector<size_t>> get_candidates_by_distance(
     const Problem& problem, const size_t max_count) {
   const size_t n = problem.points.size();

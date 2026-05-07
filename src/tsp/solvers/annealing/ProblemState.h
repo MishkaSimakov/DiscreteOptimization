@@ -1,5 +1,8 @@
 #pragma once
-#include "tsp/solvers/TourStorage.h"
+
+#include <vector>
+
+#include "tsp/Types.h"
 
 namespace tsp {
 
