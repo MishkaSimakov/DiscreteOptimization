@@ -25,14 +25,13 @@ class TwoOptActionManager {
   std::default_random_engine random_;
 
  public:
-  explicit TwoOptActionManager(const ProblemState& problem)
-      : state_(problem) {
+  explicit TwoOptActionManager(const ProblemState& problem) : state_(problem) {
     static_assert(ProblemState::candidates_count > 2,
                   "If candidates count <= 2, then generate method can fail, "
                   "because all candidates are neighbours.");
   }
 
-  TwoOptAction generate(const SolutionState& solution) {
+  std::optional<TwoOptAction> generate(const SolutionState& solution) {
     const size_t n = state_.problem.points.size();
 
     const size_t t1 = rnd::index(n, random_);

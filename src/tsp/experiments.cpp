@@ -31,10 +31,14 @@ void solve(const std::string& problem_name) {
 
   auto initial_solution = Greedy(problem).solve();
 
+  constexpr annealing::SimulatedAnnealingConfig log_config{
+      .log_best = true,
+      .log_iteration_end = true,
+  };
   auto annealing =
       annealing::SimulatedAnnealing<Problem, ProblemState, Solution,
                                     SolutionState, annealing::GeometricCooling>(
-          problem, timing::Deadline::after(30s));
+          problem, timing::Deadline::after(30s), log_config);
 
   annealing.add<TwoOptActionManager>("2opt", 1);
 
@@ -43,9 +47,9 @@ void solve(const std::string& problem_name) {
 
   const auto solution = annealing.solve(
       initial_solution,
-      annealing::GeometricCooling(start_temperature, 0.95, 100));
+      annealing::GeometricCooling(start_temperature, 0.95, 100), 0);
 
-  auto evaluation = evaluate(problem, solution);
+  const auto evaluation = evaluate(problem, solution);
 
   if (!evaluation.is_valid) {
     throw std::runtime_error("Invalid solution");

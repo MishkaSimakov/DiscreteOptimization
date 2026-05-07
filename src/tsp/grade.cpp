@@ -21,11 +21,16 @@ using namespace tsp;
 Solution solve(const Problem& problem) {
   const auto initial_solution = Greedy(problem).solve();
 
+  constexpr annealing::SimulatedAnnealingConfig log_config{
+      .log_best = true,
+      .log_iteration_end = true,
+  };
+
   const auto deadline = timing::Deadline::after(10min);
   auto annealing =
       annealing::SimulatedAnnealing<Problem, ProblemState, Solution,
                                     SolutionState, annealing::GeometricCooling>(
-          problem, deadline);
+          problem, deadline, log_config);
 
   annealing.add<TwoOptActionManager>("2opt", 1);
 
@@ -34,7 +39,7 @@ Solution solve(const Problem& problem) {
 
   const auto sa_solution = annealing.solve(
       initial_solution,
-      annealing::GeometricCooling(start_temperature, 0.96, 100));
+      annealing::GeometricCooling(start_temperature, 0.96, 100), 0);
 
   std::println("{} -> {}", get_score(problem, initial_solution),
                get_score(problem, sa_solution));
