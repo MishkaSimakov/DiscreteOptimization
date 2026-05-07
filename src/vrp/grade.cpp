@@ -19,8 +19,27 @@
 using namespace std::chrono_literals;
 using namespace vrp;
 
-Solution run_annealing(const Problem& problem, const Solution& initial_solution,
-                       timing::Deadline deadline) {
+Solution solve(const Problem& problem) {
+  const auto initial_solution = Random(problem).solve();
+
+  // calculate initial temperature
+  const auto neighbors = get_neighbors_by_distance(
+      problem.customers | std::views::transform([](const Customer customer) {
+        return customer.position;
+      }),
+      5);
+
+  ArithmeticMean<double> average_distance;
+  for (size_t i = 0; i < problem.customers.size(); ++i) {
+    for (const size_t j : neighbors[i]) {
+      average_distance.record(geom::distance(problem.customers[i].position,
+                                             problem.customers[j].position));
+    }
+  }
+
+  const double start_temperature = 1 * *average_distance;
+  std::println("  T_start = {}", start_temperature);
+
   constexpr annealing::SimulatedAnnealingConfig config{
       .log_best = true,
       .log_iteration_end = true,
@@ -29,29 +48,17 @@ Solution run_annealing(const Problem& problem, const Solution& initial_solution,
   auto annealing =
       annealing::SimulatedAnnealing<Problem, ProblemState, Solution,
                                     SolutionState, annealing::GeometricCooling>(
-          problem, deadline, config);
+          problem, timing::Deadline::after(120s), config);
 
   annealing.add<ChangeVehicleManager>("change_vehicle", 1);
   annealing.add<TwoOptManager>("2opt", 1);
 
-  const double start_temperature =
-      annealing.estimate_start_temperature(100'000, 0.5, initial_solution);
+  const double infeasibility_penalty = start_temperature * 0.75;
 
-  const double infeasibility_penalty = start_temperature * 1.;
-
-  return annealing.solve(
-      initial_solution,
-      annealing::GeometricCooling(start_temperature, 0.99, 100),
-      infeasibility_penalty);
-}
-
-Solution solve(const Problem& problem) {
-  const auto initial_solution = Random(problem).solve();
-
-  const auto slightly_better =
-      run_annealing(problem, initial_solution, timing::Deadline::after(10s));
-
-  return run_annealing(problem, slightly_better, timing::Deadline::after(60s));
+  const auto solution =
+      annealing.solve(initial_solution,
+                      annealing::GeometricCooling(start_temperature, 0.98, 100),
+                      infeasibility_penalty);
 }
 
 int main(int argc, char** argv) {
