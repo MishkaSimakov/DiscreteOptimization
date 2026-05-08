@@ -74,6 +74,19 @@ jobs:
           - task: facility
             instance: fl_2000_2
 
+          - task: vrp
+            instance: vrp_16_3_1
+          - task: vrp
+            instance: vrp_26_8_1
+          - task: vrp
+            instance: vrp_51_5_1
+          - task: vrp
+            instance: vrp_101_10_1
+          - task: vrp
+            instance: vrp_200_16_1
+          - task: vrp
+            instance: vrp_421_41_1
+
     uses: ./.github/workflows/solve_instance.yml
     with:
       if: ${{ github.ref_name == 'master' || matrix.task == github.ref_name }}
@@ -107,6 +120,9 @@ jobs:
     needs: collect-artifacts
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
       # library for parsing json
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
@@ -129,20 +145,35 @@ jobs:
             exit 0
           fi
 
-          # Extract unique task names
+          task_full_name() {
+            case "$1" in
+              sc)  echo "setcover"  ;;
+              ks)  echo "knapsack"  ;;
+              gc)  echo "coloring"  ;;
+              tsp) echo "tsp"       ;;
+              fl)  echo "facility"  ;;
+              *)   echo "$1"        ;;
+            esac
+          }
+
+          # Extract unique task prefixes
           tasks=$(for f in $files; do
             basename "$f" _stats.json | cut -d'_' -f1
           done | sort -u)
 
           for task in $tasks; do
-            echo "### $task" >> $GITHUB_STEP_SUMMARY
-            echo "| Instance | Score | Duration (ms) |" >> $GITHUB_STEP_SUMMARY
-            echo "|----------|--------|---------------|" >> $GITHUB_STEP_SUMMARY
+            full=$(task_full_name "$task")
+            maximize=$(jq -r --arg t "$full" '.[$t].maximize // false' data/thresholds.json 2>/dev/null || echo false)
+
+            echo "### $full" >> $GITHUB_STEP_SUMMARY
+            echo "[Compare](https://mishkasimakov.github.io/DiscreteOptimization/compare.html?commit=${GITHUB_SHA::7}&problem=$full)" >> $GITHUB_STEP_SUMMARY
+            echo "| Instance | Score | Easy | Hard | Status | Duration (ms) |" >> $GITHUB_STEP_SUMMARY
+            echo "|----------|-------|------|------|--------|---------------|" >> $GITHUB_STEP_SUMMARY
 
             task_files=$(ls artifacts/${task}_*_stats.json 2>/dev/null | sort -V || true)
 
             if [ -z "$task_files" ]; then
-              echo "| (no data) | - | - |" >> $GITHUB_STEP_SUMMARY
+              echo "| (no data) | - | - | - | - | - |" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               continue
             fi
@@ -153,8 +184,74 @@ jobs:
               score=$(jq '.score' "$file")
               duration=$(jq '.duration' "$file")
 
-              echo "| $name | $score | $duration |" >> $GITHUB_STEP_SUMMARY
+              easy=$(jq -r --arg t "$full" --arg i "$name" '.[$t].instances[$i].easy // empty' data/thresholds.json 2>/dev/null)
+              hard=$(jq -r --arg t "$full" --arg i "$name" '.[$t].instances[$i].hard // empty' data/thresholds.json 2>/dev/null)
+
+              easy_disp="${easy:-—}"
+              hard_disp="${hard:-—}"
+
+              if [ -n "$score" ] && [ "$score" != "null" ] && { [ -n "$easy" ] || [ -n "$hard" ]; }; then
+                status=$(awk -v s="$score" -v e="${easy:-}" -v h="${hard:-}" -v m="$maximize" 'BEGIN {
+                  hard_met = (h != "" && (m == "true" ? s+0 >= h+0 : s+0 <= h+0))
+                  easy_met = (e != "" && (m == "true" ? s+0 >= e+0 : s+0 <= e+0))
+                  if (hard_met)      print "🟢 hard"
+                  else if (easy_met) print "🟡 easy"
+                  else               print "🔴 miss"
+                }')
+              else
+                status="—"
+              fi
+
+              echo "| $name | $score | $easy_disp | $hard_disp | $status | $duration |" >> $GITHUB_STEP_SUMMARY
             done
 
             echo "" >> $GITHUB_STEP_SUMMARY
           done
+
+  store-results:
+    runs-on: ubuntu-latest
+    needs: collect-artifacts
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository (for scripts)
+        uses: actions/checkout@v6
+
+      - name: Checkout dashboard-data branch
+        uses: actions/checkout@v6
+        with:
+          ref: dashboard-data
+          path: dashboard-data
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: all-results
+          path: artifacts
+        continue-on-error: true
+
+      - name: Append results to history
+        run: python3 scripts/collect_results.py
+        env:
+          ARTIFACTS_DIR: artifacts
+          OUTPUT_FILE: dashboard-data/history.jsonl
+          COMMIT: ${{ github.sha }}
+          BRANCH: ${{ github.ref_name }}
+
+      - name: Copy thresholds to dashboard-data
+        run: cp data/thresholds.json dashboard-data/thresholds.json
+
+      - name: Commit and push history
+        run: |
+          cd dashboard-data
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add history.jsonl thresholds.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "results: ${{ github.ref_name }}@$(echo '${{ github.sha }}' | cut -c1-7)"
+          git pull --rebase origin dashboard-data
+          git push origin dashboard-data

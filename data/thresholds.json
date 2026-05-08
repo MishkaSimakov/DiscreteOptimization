@@ -1,0 +1,68 @@
+{
+  "setcover": {
+    "maximize": false,
+    "instances": {
+      "sc_157_0":   { "easy": 130000, "hard": 94402 },
+      "sc_330_0":   { "easy": 29, "hard": 24 },
+      "sc_1000_11": { "easy": 240, "hard": 147 },
+      "sc_5000_1":  { "easy": 70, "hard": 31 },
+      "sc_10000_5": { "easy": 120, "hard": 64 },
+      "sc_10000_2": { "easy": 280, "hard": 167 }
+    }
+  },
+  "knapsack": {
+    "maximize": true,
+    "instances": {
+      "ks_30_0":    { "easy": 92000, "hard": 99798 },
+      "ks_50_0":    { "easy": 1419561, "hard": 142156 },
+      "ks_200_0":   { "easy": 100062, "hard": 100236 },
+      "ks_400_0":   { "easy": 3966813, "hard": 3967028 },
+      "ks_1000_0":  { "easy": 109869, "hard": 109899 },
+      "ks_10000_0": { "easy": 1099870, "hard": 1099881 }
+    }
+  },
+  "coloring": {
+    "maximize": false,
+    "instances": {
+      "gc_50_3":   { "easy": 8, "hard": 6 },
+      "gc_70_7":   { "easy": 20, "hard": 17 },
+      "gc_100_5":  { "easy": 21, "hard": 16 },
+      "gc_250_9":  { "easy": 95, "hard": 78 },
+      "gc_500_1":  { "easy": 18, "hard": 16 },
+      "gc_1000_5": { "easy": 124, "hard": 100 }
+    }
+  },
+  "tsp": {
+    "maximize": false,
+    "instances": {
+      "tsp_51_1":    { "easy": 482, "hard": 430 },
+      "tsp_100_3":   { "easy": 23433, "hard": 20800 },
+      "tsp_200_2":   { "easy": 35985, "hard": 30000 },
+      "tsp_574_1":   { "easy": 40000, "hard": 37600 },
+      "tsp_1889_1":  { "easy": 378069, "hard": 323000 },
+      "tsp_33810_1": { "easy": 78478868, "hard": 67700000 }
+    }
+  },
+  "facility": {
+    "maximize": false,
+    "instances": {
+      "fl_25_2":   { "easy": 4000000, "hard": 3269822 },
+      "fl_100_1":  { "easy": 26000000, "hard": 22724634 },
+      "fl_200_7":  { "easy": 5000000, "hard": 4711295 },
+      "fl_500_7":  { "easy": 30000000, "hard": 27006099 },
+      "fl_1000_2": { "easy": 10000000, "hard": 8879294 },
+      "fl_2000_2": { "easy": 10000000, "hard": 7453531 }
+    }
+  },
+  "vrp": {
+    "maximize": false,
+    "instances": {
+      "vrp_16_3_1":   { "easy": 387, "hard": 280 },
+      "vrp_26_8_1":   { "easy": 1019, "hard": 630 },
+      "vrp_51_5_1":   { "easy": 713, "hard": 540 },
+      "vrp_101_10_1": { "easy": 1193, "hard": 830 },
+      "vrp_200_16_1": { "easy": 3719, "hard": 1400 },
+      "vrp_421_41_1": { "easy": 2392, "hard": 2000 }
+    }
+  }
+}

@@ -42,7 +42,7 @@ std::vector<size_t> unique_indices(size_t size, size_t count, Gen&& generator) {
 template <typename Gen>
   requires std::uniform_random_bit_generator<std::remove_reference_t<Gen>>
 bool bernoulli(double probability, Gen&& generator) {
-  assert(0 <= probability <= 1);
+  assert(0 <= probability && probability <= 1);
 
   return std::bernoulli_distribution(probability)(generator);
 }

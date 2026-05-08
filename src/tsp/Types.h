@@ -19,6 +19,13 @@ inline double distance(Point x, Point y) {
   return std::sqrt(dx * dx + dy * dy);
 }
 
+inline double distance_sqr(Point x, Point y) {
+  const double dx = static_cast<double>(x.x) - static_cast<double>(y.x);
+  const double dy = static_cast<double>(x.y) - static_cast<double>(y.y);
+
+  return dx * dx + dy * dy;
+}
+
 struct Problem {
   std::vector<Point> points;
 

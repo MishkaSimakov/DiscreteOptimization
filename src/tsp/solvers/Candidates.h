@@ -17,6 +17,7 @@
 
 namespace tsp {
 
+// TODO: replace this with Neighbors.h
 inline std::vector<std::vector<size_t>> get_candidates_by_distance(
     const Problem& problem, const size_t max_count) {
   const size_t n = problem.points.size();
@@ -26,7 +27,7 @@ inline std::vector<std::vector<size_t>> get_candidates_by_distance(
 
   for (size_t i = 0; i < n; ++i) {
     auto proj = [i, &problem](size_t j) {
-      return distance(problem.points[i], problem.points[j]);
+      return distance_sqr(problem.points[i], problem.points[j]);
     };
 
     for (size_t j = 0; j < n; ++j) {
@@ -43,7 +44,7 @@ inline std::vector<std::vector<size_t>> get_candidates_by_distance(
       }
     }
 
-    result[i] = heap;
+    result[i] = std::move(heap);
     heap.clear();
   }
 
