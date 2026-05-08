@@ -102,7 +102,7 @@ class ChangeCustomerFacilityManager {
       }
     }
 
-    return *closest.argmin();
+    return closest->index;
   }
 
  public:

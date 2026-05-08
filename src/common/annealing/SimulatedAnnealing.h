@@ -44,6 +44,7 @@ class SimulatedAnnealing {
     double temperature;
     double infeasibility_penalty;
     std::default_random_engine& random;
+    size_t changes_count;
   };
 
   struct ActionType {
@@ -84,7 +85,7 @@ class SimulatedAnnealing {
     std::uniform_real_distribution<double> prob(0, 1);
 
     const std::optional<typename M::Action> action =
-        manager.generate(std::as_const(state.solution));
+        manager.generate(std::as_const(state.solution), state.changes_count);
 
     if (!action) {
       return std::nullopt;
@@ -109,7 +110,7 @@ class SimulatedAnnealing {
 
   template <ActionManager<ProblemState, SolutionState> M>
   static ActionGain get_gain(M& manager, const SolutionState& state) {
-    const std::optional<typename M::Action> action = manager.generate(state);
+    const std::optional<typename M::Action> action = manager.generate(state, 0);
 
     if (!action) {
       return ActionGain{0, 0};
@@ -229,6 +230,9 @@ class SimulatedAnnealing {
         .infeasibility = current_infeasibility,
     };
 
+    // May be used to implement taboo list inside actions
+    size_t changes_count = 0;
+
     InfeasibilityController infeasibility(infeasibility_penalty);
 
     size_t iterations_per_temperature = 100;
@@ -247,12 +251,14 @@ class SimulatedAnnealing {
           .temperature = cooling.get_temperature(),
           .infeasibility_penalty = infeasibility.get_penalty(),
           .random = random_,
+          .changes_count = changes_count,
       };
       const std::optional<ActionGain> gain =
           actions_[chosen_action].try_apply(state_dto);
 
       ++actions_stats[chosen_action].proposed_transitions;
       if (gain) {
+        ++changes_count;
         ++actions_stats[chosen_action].accepted_transitions;
 
         current_score -= gain->score;

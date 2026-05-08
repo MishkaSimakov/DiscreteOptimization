@@ -184,7 +184,7 @@ class SimulatedAnnealing {
         }
 
         const size_t nanoseconds_per_iteration =
-            static_cast<size_t>(average_iteration_time.mean());
+            static_cast<size_t>(*average_iteration_time);
 
         iterations_until_change = remaining_nanoseconds /
                                   nanoseconds_per_iteration /
@@ -194,9 +194,9 @@ class SimulatedAnnealing {
             "  # iterations = {} (average itr time = {} ns), score = {}, inf = "
             "{}, coef = "
             "{}, T = {}, opened count = {}",
-            iterations_until_change, average_iteration_time.mean(),
-            current_cost, current_infeasibility, infeasibility_coef_,
-            temperature_, state.opened.size());
+            iterations_until_change, *average_iteration_time, current_cost,
+            current_infeasibility, infeasibility_coef_, temperature_,
+            state.opened.size());
       }
 
       --iterations_until_change;

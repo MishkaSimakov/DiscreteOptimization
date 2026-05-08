@@ -57,7 +57,7 @@ class CloseFacilityManager {
                                               customer.position));
       }
 
-      const size_t new_facility = *closest.argmin();
+      const size_t new_facility = closest->index;
 
       auto new_itr =
           new_demands.emplace(new_facility, state.demands[new_facility]).first;
@@ -107,7 +107,7 @@ class CloseFacilityManager {
                                               customer.position));
       }
 
-      const size_t new_facility = *closest.argmin();
+      const size_t new_facility = closest->index;
 
       state.solution.facility[i] = new_facility;
 

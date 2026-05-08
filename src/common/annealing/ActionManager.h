@@ -8,11 +8,11 @@ namespace annealing {
 template <typename T, typename ProblemState, typename SolutionState>
 concept ActionManager =
     requires(T manager, const ProblemState& problem_state, SolutionState state,
-             typename T::Action action) {
+             size_t changes_count, typename T::Action action) {
       T(problem_state);
 
       {
-        manager.generate(std::as_const(state))
+        manager.generate(std::as_const(state), changes_count)
       } -> std::same_as<std::optional<typename T::Action>>;
       {
         manager.get_gain(std::as_const(state), std::as_const(action))
