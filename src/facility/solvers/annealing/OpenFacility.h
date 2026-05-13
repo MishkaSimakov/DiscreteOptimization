@@ -5,16 +5,29 @@
 #include <unordered_map>
 #include <vector>
 
-#include "State.h"
+#include "ProblemState.h"
+#include "SolutionState.h"
+#include "common/annealing/ActionGain.h"
+#include "common/annealing/SolverState.h"
 #include "helpers/Random.h"
 
 namespace facility {
 
 struct OpenFacilityAction {
+  // index of newly opened facility
   size_t facility;
+
+  // indices of customers that go into that facility
+  std::vector<size_t> customers;
 };
 
 class OpenFacilityManager {
+ public:
+  using Action = OpenFacilityAction;
+
+ private:
+  const ProblemState& state_;
+
   std::default_random_engine random_;
   std::vector<size_t> customers_;
 
@@ -23,135 +36,126 @@ class OpenFacilityManager {
   }
 
  public:
-  explicit OpenFacilityManager(const Problem& problem)
-      : customers_(problem.customers.size()) {
+  explicit OpenFacilityManager(const ProblemState& problem)
+      : state_(problem), customers_(problem.problem.customers.size()) {
     assert(customers_.size() >= 10);
     std::iota(customers_.begin(), customers_.end(), 0);
   }
 
-  OpenFacilityAction generate(const SolutionState& state) {
-    return OpenFacilityAction{choose_facility(state)};
-  }
+  std::optional<OpenFacilityAction> generate(const SolutionState& state,
+                                             annealing::SolverStateDTO solver) {
+    if (state.closed.empty()) {
+      return std::nullopt;
+    }
 
-  std::pair<double, double> get_gain(const SolutionState& state,
-                                     OpenFacilityAction action) {
-    // use simple greedy algorithm to grab some customers to it
+    const size_t facility_index = choose_facility(state);
+    const Facility facility = state_.problem.facilities[facility_index];
 
-    // take 10 closest customers as candidates
+    std::vector<size_t> customers;
+
+    // use simple greedy algorithm to grab some customers for new facility
+
     auto distance_proj = [&](size_t customer) {
-      return std::pair{
-          distance_sqr(state.problem.customers[customer].position,
-                       state.problem.facilities[action.facility].position),
-          customer};
+      return distance_sqr(state_.problem.customers[customer].position,
+                          facility.position);
     };
 
-    const auto nth = customers_.begin() + 10;
-    std::ranges::nth_element(customers_, nth, {}, distance_proj);
-    std::ranges::sort(customers_.begin(), nth, {}, distance_proj);
+    std::ranges::sort(customers_, {}, distance_proj);
 
     double demand = 0;
-    double gain = 0;
 
-    std::unordered_map<size_t, double> updated_demands;
+    for (const size_t i : customers_) {
+      const Customer& customer = state_.problem.customers[i];
 
-    for (const size_t i : std::span{customers_.begin(), nth}) {
-      const Customer& customer = state.problem.customers[i];
-
-      if (demand + customer.demand >
-          state.problem.facilities[action.facility].capacity) {
+      if (demand + customer.demand > facility.capacity) {
         continue;
       }
 
-      auto [itr, inserted] = updated_demands.emplace(
-          state.solution.facility[i],
-          state.demands[state.solution.facility[i]] - customer.demand);
-
-      if (!inserted) {
-        itr->second -= customer.demand;
-      }
-
       demand += customer.demand;
-      gain += distance(
-                  state.problem.facilities[state.solution.facility[i]].position,
-                  customer.position) -
-              distance(state.problem.facilities[action.facility].position,
-                       customer.position);
+      customers.push_back(i);
     }
 
-    gain -= state.problem.facilities[action.facility].cost;
-
-    double infeasibility_gain = 0;
-    for (const auto [facility, new_demand] : updated_demands) {
-      const double capacity = state.problem.facilities[facility].capacity;
-
-      if (state.demands[facility] > capacity && new_demand <= capacity) {
-        infeasibility_gain += state.demands[facility] - capacity;
-      }
-
-      // some facilities may accidentally be closed
-      if (new_demand < 1e-10) {
-        gain += state.problem.facilities[facility].cost;
-      }
-    }
-
-    return {gain, infeasibility_gain};
+    return OpenFacilityAction{
+        .facility = facility_index,
+        .customers = std::move(customers),
+    };
   }
 
-  void apply_action(SolutionState& state, OpenFacilityAction action) {
-    // use simple greedy algorithm to grab some customers to it
+  annealing::ActionGain get_gain(const SolutionState& solution,
+                                 OpenFacilityAction action) {
+    const auto& facilities = state_.problem.facilities;
 
-    // take 10 closest customers as candidates
-    auto distance_proj = [&](size_t customer) {
-      return std::pair{
-          distance_sqr(state.problem.customers[customer].position,
-                       state.problem.facilities[action.facility].position),
-          customer};
-    };
+    double score_gain = 0;
 
-    const auto nth = customers_.begin() + 10;
-    std::ranges::nth_element(customers_, nth, {}, distance_proj);
-    std::ranges::sort(customers_.begin(), nth, {}, distance_proj);
+    std::unordered_map<size_t, double> updated_capacity;
 
+    for (const size_t i : action.customers) {
+      const size_t old_facility = solution.solution.facility[i];
+      const Customer& customer = state_.problem.customers[i];
+
+      auto [itr, inserted] = updated_capacity.emplace(
+          old_facility, solution.capacity[old_facility]);
+
+      itr->second += customer.demand;
+
+      score_gain +=
+          distance(facilities[old_facility].position, customer.position) -
+          distance(facilities[action.facility].position, customer.position);
+    }
+
+    score_gain -= facilities[action.facility].cost;
+
+    double infeasibility_gain = 0;
+    for (const auto [facility, new_capacity] : updated_capacity) {
+      infeasibility_gain += std::max(-solution.capacity[facility], 0.) -
+                            std::max(-new_capacity, 0.);
+
+      // some facilities may accidentally be closed
+      if (facilities[facility].capacity - new_capacity < 1e-10) {
+        score_gain += state_.problem.facilities[facility].cost;
+      }
+    }
+
+    return {score_gain, infeasibility_gain};
+  }
+
+  void apply_action(SolutionState& solution, OpenFacilityAction action,
+                    annealing::SolverStateDTO solver) {
     bool changed_feasibility = false;
 
     std::unordered_set<size_t> closed_facilities;
 
-    for (const size_t i : std::span{customers_.begin(), nth}) {
-      const Customer& customer = state.problem.customers[i];
+    for (const size_t i : action.customers) {
+      const Customer& customer = state_.problem.customers[i];
+      const size_t old_facility = solution.solution.facility[i];
 
-      if (state.demands[action.facility] + customer.demand >
-          state.problem.facilities[action.facility].capacity) {
-        continue;
-      }
-
-      const size_t old_facility = state.solution.facility[i];
-      const double capacity = state.problem.facilities[old_facility].capacity;
-
-      if (state.demands[old_facility] > capacity &&
-          state.demands[old_facility] - customer.demand <= capacity) {
+      if (solution.capacity[old_facility] < -1e-10 &&
+          solution.capacity[old_facility] + customer.demand >= -1e-10) {
         changed_feasibility = true;
       }
 
-      state.demands[action.facility] += customer.demand;
-      state.demands[old_facility] -= customer.demand;
-      state.solution.facility[i] = action.facility;
+      solution.capacity[action.facility] -= customer.demand;
+      solution.capacity[old_facility] += customer.demand;
+      solution.solution.facility[i] = action.facility;
 
-      if (state.demands[old_facility] < 1e-10) {
+      if (state_.problem.facilities[old_facility].capacity -
+              solution.capacity[old_facility] <
+          1e-10) {
         closed_facilities.insert(old_facility);
       }
     }
 
-    std::erase(state.closed, action.facility);
-    state.opened.push_back(action.facility);
+    std::erase(solution.closed, action.facility);
+    solution.opened.push_back(action.facility);
 
-    std::erase_if(state.opened,
+    std::erase_if(solution.opened,
                   [&](size_t i) { return closed_facilities.contains(i); });
     for (const size_t i : closed_facilities) {
-      state.closed.push_back(i);
+      solution.closed.push_back(i);
     }
 
     if (changed_feasibility) {
-      state.update_infeasible_customers();
+      solution.update_infeasible_customers();
     }
   }
 };

@@ -12,6 +12,7 @@
 #include <tuple>
 
 #include "ActionManager.h"
+#include "ActionManagerBox.h"
 #include "CoolingProcess.h"
 #include "InfeasibilityController.h"
 #include "helpers/Random.h"
@@ -22,6 +23,7 @@ namespace annealing {
 struct SimulatedAnnealingConfig {
   bool log_best;
   bool log_iteration_end;
+  bool verify_gain;
 };
 
 // Solves minimization problem with constraints.
@@ -33,33 +35,12 @@ struct SimulatedAnnealingConfig {
 template <typename Problem, typename ProblemState, typename Solution,
           typename SolutionState, CoolingProcess C>
 class SimulatedAnnealing {
-  const ProblemState problem_state;
-  const timing::Deadline deadline;
-  const SimulatedAnnealingConfig config;
-
-  std::default_random_engine random_;
-
-  struct SolverStateDTO {
-    SolutionState& solution;
-    double temperature;
-    double infeasibility_penalty;
-    std::default_random_engine& random;
-    size_t changes_count;
-  };
-
   struct ActionType {
     std::string name;
     double weight;
 
-    // Samples random action of this type, applies it with Simulated Annealing
-    // probability model.
-    std::function<std::optional<ActionGain>(SolverStateDTO)> try_apply;
-
-    // Samples random action of this type, and returns its gain.
-    std::function<ActionGain(const SolutionState&)> get_gain;
+    std::unique_ptr<ActionManagerBox<SolutionState>> box;
   };
-
-  std::vector<ActionType> actions_;
 
   struct ActionTypeStats {
     size_t proposed_transitions{0};
@@ -77,47 +58,11 @@ class SimulatedAnnealing {
     double infeasibility;
   };
 
-  // Tries to apply given action to current solution state.
-  // If successfully applied, returns gain and infeasibility gain. Otherwise,
-  // returns std::nullopt.
-  template <ActionManager<ProblemState, SolutionState> M>
-  static std::optional<ActionGain> try_apply(M& manager, SolverStateDTO state) {
-    std::uniform_real_distribution<double> prob(0, 1);
+  const ProblemState problem_state;
+  const SimulatedAnnealingConfig config;
 
-    const std::optional<typename M::Action> action =
-        manager.generate(std::as_const(state.solution), state.changes_count);
-
-    if (!action) {
-      return std::nullopt;
-    }
-
-    const ActionGain gain =
-        manager.get_gain(std::as_const(state.solution), std::as_const(*action));
-
-    const double combined_gain =
-        gain.score + gain.infeasibility * state.infeasibility_penalty;
-
-    // accept using simulated annealing algorithm
-    if (combined_gain > 0 ||
-        std::exp(combined_gain / state.temperature) > prob(state.random)) {
-      manager.apply_action(state.solution, std::move(*action));
-
-      return gain;
-    }
-
-    return std::nullopt;
-  }
-
-  template <ActionManager<ProblemState, SolutionState> M>
-  static ActionGain get_gain(M& manager, const SolutionState& state) {
-    const std::optional<typename M::Action> action = manager.generate(state, 0);
-
-    if (!action) {
-      return ActionGain{0, 0};
-    }
-
-    return manager.get_gain(state, *action);
-  }
+  std::default_random_engine random_;
+  std::vector<ActionType> actions_;
 
   double get_total_actions_weight() const {
     double result = 0;
@@ -152,15 +97,19 @@ class SimulatedAnnealing {
   void assert_score_validity([[maybe_unused]] const SolutionState& state,
                              [[maybe_unused]] double score,
                              [[maybe_unused]] double infeasibility) {
-#ifndef NDEBUG
-    const double real_score =
-        get_score(problem_state.get_problem(), state.get_solution());
-    assert(std::abs(real_score - score) < 1e-3);
+    if (config.verify_gain) {
+      const double real_score =
+          get_score(problem_state.get_problem(), state.get_solution());
+      if (std::abs(real_score - score) > 1e-3) {
+        throw std::runtime_error("Score gain is incorrect.");
+      }
 
-    const double real_infeasibility =
-        get_infeasibility(problem_state.get_problem(), state.get_solution());
-    assert(std::abs(real_infeasibility - infeasibility) < 1e-3);
-#endif
+      const double real_infeasibility =
+          get_infeasibility(problem_state.get_problem(), state.get_solution());
+      if (std::abs(real_infeasibility - infeasibility) > 1e-3) {
+        throw std::runtime_error("Infeasibility gain is incorrect.");
+      }
+    }
   }
 
   void log_new_best(const BestSolution& best) const {
@@ -177,9 +126,9 @@ class SimulatedAnnealing {
   }
 
  public:
-  explicit SimulatedAnnealing(const Problem& problem, timing::Deadline deadline,
+  explicit SimulatedAnnealing(const Problem& problem,
                               SimulatedAnnealingConfig config)
-      : problem_state(problem), deadline(deadline), config(config) {}
+      : problem_state(problem), config(config) {}
 
   // non copyable
   SimulatedAnnealing(const SimulatedAnnealing&) = delete;
@@ -194,14 +143,9 @@ class SimulatedAnnealing {
     ActionType action{
         .name = name,
         .weight = weight,
-        .try_apply =
-            [manager = M(problem_state)](SolverStateDTO state) mutable {
-              return try_apply(manager, state);
-            },
-        .get_gain =
-            [manager = M(problem_state)](const SolutionState& state) mutable {
-              return get_gain(manager, state);
-            },
+        .box = std::make_unique<
+            ActionManagerBoxImpl<M, ProblemState, SolutionState>>(
+            problem_state),
     };
 
     actions_.push_back(std::move(action));
@@ -211,9 +155,14 @@ class SimulatedAnnealing {
   // infeasibility, then by score.
   // Note: returned solution may not be feasible.
   Solution solve(const Solution& initial_solution, C cooling,
-                 double infeasibility_penalty) {
+                 double infeasibility_penalty,
+                 const timing::Deadline deadline) {
     if (actions_.empty()) {
       throw std::runtime_error("No actions are available.");
+    }
+
+    for (const auto& action : actions_) {
+      action.box->reset();
     }
 
     std::vector<ActionTypeStats> actions_stats(actions_.size());
@@ -246,7 +195,7 @@ class SimulatedAnnealing {
     while (true) {
       const size_t chosen_action = get_random_action_type();
 
-      SolverStateDTO state_dto{
+      InternalStateDTO state_dto{
           .solution = state,
           .temperature = cooling.get_temperature(),
           .infeasibility_penalty = infeasibility.get_penalty(),
@@ -254,7 +203,7 @@ class SimulatedAnnealing {
           .changes_count = changes_count,
       };
       const std::optional<ActionGain> gain =
-          actions_[chosen_action].try_apply(state_dto);
+          actions_[chosen_action].box->try_apply(state_dto);
 
       ++actions_stats[chosen_action].proposed_transitions;
       if (gain) {
@@ -359,7 +308,7 @@ class SimulatedAnnealing {
     for (size_t i = 0; i < samples; ++i) {
       const size_t action_type = get_random_action_type();
 
-      const ActionGain gain = actions_[action_type].get_gain(state);
+      const ActionGain gain = actions_[action_type].box->get_gain(state);
 
       if (gain.score > -tolerance) {
         ++positive_gain_count;

@@ -1,8 +1,10 @@
 #pragma once
 
 #include <random>
+#include <span>
 
-#include "State.h"
+#include "SolutionState.h"
+#include "common/annealing/ActionGain.h"
 #include "helpers/Random.h"
 
 namespace facility {
@@ -13,6 +15,10 @@ struct SwapOpenedFacilityAction {
 };
 
 class SwapOpenedFacilityManager {
+ public:
+  using Action = SwapOpenedFacilityAction;
+
+ private:
   std::default_random_engine random_;
 
   size_t choose_opened_facility(const SolutionState& state) {
@@ -44,27 +50,28 @@ class SwapOpenedFacilityManager {
  public:
   explicit SwapOpenedFacilityManager(const Problem& problem) {}
 
-  SwapOpenedFacilityAction generate(const SolutionState& state) {
+  std::optional<SwapOpenedFacilityAction> generate(const SolutionState& state,
+                                                   size_t changes_count) {
     const size_t opened = choose_opened_facility(state);
     const size_t closed = choose_closed_facility(state, opened);
 
     return SwapOpenedFacilityAction{opened, closed};
   }
 
-  std::pair<double, double> get_gain(const SolutionState& state,
-                                     SwapOpenedFacilityAction action) {
+  annealing::ActionGain get_gain(const SolutionState& state,
+                                 SwapOpenedFacilityAction action) {
     const Facility& opened = state.problem.facilities[action.opened];
     const Facility& closed = state.problem.facilities[action.closed];
 
-    double gain = opened.cost - closed.cost;
+    double score_gain = opened.cost - closed.cost;
 
     // distance gain
     for (size_t i = 0; i < state.problem.customers.size(); ++i) {
       const Customer& customer = state.problem.customers[i];
 
       if (state.solution.facility[i] == action.opened) {
-        gain += distance(customer.position, opened.position) -
-                distance(customer.position, closed.position);
+        score_gain += distance(customer.position, opened.position) -
+                      distance(customer.position, closed.position);
       }
     }
 
@@ -72,7 +79,10 @@ class SwapOpenedFacilityManager {
         std::max(state.demands[action.opened] - opened.capacity, 0.) -
         std::max(state.demands[action.opened] - closed.capacity, 0.);
 
-    return {gain, infeasibility_gain};
+    return {
+        .score = score_gain,
+        .infeasibility = infeasibility_gain,
+    };
   }
 
   void apply_action(SolutionState& state, SwapOpenedFacilityAction action) {
