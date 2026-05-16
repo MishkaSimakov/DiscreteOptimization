@@ -7,11 +7,11 @@
 namespace facility {
 
 inline double get_infeasibility(const Problem& problem,
-                                const Solution& solution) {
+                                const std::vector<size_t>& solution) {
   std::vector<double> total_demands(problem.facilities.size(), 0);
 
   for (size_t i = 0; i < problem.customers.size(); ++i) {
-    total_demands[solution.facility[i]] += problem.customers[i].demand;
+    total_demands[solution[i]] += problem.customers[i].demand;
   }
 
   double result = 0;
@@ -23,6 +23,11 @@ inline double get_infeasibility(const Problem& problem,
   }
 
   return result;
+}
+
+inline double get_infeasibility(const Problem& problem,
+                                const Solution& solution) {
+  return get_infeasibility(problem, solution.facility);
 }
 
 inline double get_score(const Problem& problem,

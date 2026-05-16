@@ -248,7 +248,7 @@ class SimulatedAnnealing {
         const Duration average_iteration_time =
             Duration(now - iteration_start) / iterations_per_temperature;
 
-        if (remaining_time < std::chrono::milliseconds{100}) {
+        if (remaining_time < std::chrono::milliseconds{1}) {
           break;
         }
 

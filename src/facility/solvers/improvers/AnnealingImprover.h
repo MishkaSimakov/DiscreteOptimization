@@ -40,13 +40,13 @@ class AnnealingImprover {
   std::vector<size_t> improve(std::vector<size_t> solution,
                               std::vector<double> demands) {
     const double start_temperature = 1000;
-    const double infeasibility_penalty = 1 * start_temperature;
+    const double infeasibility_penalty = 50;
 
     const auto improved = annealing_.solve(
         Solution{solution},
         annealing::GeometricCooling(start_temperature, 0.9, 10),
         infeasibility_penalty,
-        timing::Deadline::after(std::chrono::milliseconds{200}));
+        timing::Deadline::after(std::chrono::milliseconds{15}));
 
     return improved.facility;
   }
