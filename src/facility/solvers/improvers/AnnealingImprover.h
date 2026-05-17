@@ -3,6 +3,7 @@
 #include <optional>
 #include <vector>
 
+#include "TwoOptImprover.h"
 #include "facility/Types.h"
 #include "facility/solvers/Neighborhood.h"
 
@@ -30,23 +31,38 @@ class AnnealingImprover {
                                 annealing::GeometricCooling>
       annealing_;
 
+  TwoOptImprover two_opt;
+
  public:
   explicit AnnealingImprover(const Problem& problem)
-      : problem(problem), annealing_(problem, log_config) {
+      : problem(problem), annealing_(problem, log_config), two_opt(problem) {
     annealing_.add<ChangeCustomerFacilityManager>("change_customer_facility",
                                                   1);
   }
 
   std::vector<size_t> improve(std::vector<size_t> solution,
                               std::vector<double> demands) {
-    const double start_temperature = 1000;
-    const double infeasibility_penalty = 50;
+    solution = two_opt.improve(std::move(solution), std::move(demands));
+
+    const double start_temperature = 100;
+    const double infeasibility_penalty = 100;
+
+    // auto score_before = get_score(problem, solution);
 
     const auto improved = annealing_.solve(
-        Solution{solution},
-        annealing::GeometricCooling(start_temperature, 0.9, 10),
-        infeasibility_penalty,
-        timing::Deadline::after(std::chrono::milliseconds{15}));
+        Solution{std::move(solution)},
+        annealing::GeometricCooling(start_temperature, start_temperature / 10),
+        infeasibility_penalty, std::chrono::milliseconds{5});
+
+    // auto score_after = get_score(problem, improved);
+    //
+    // if (score_before < score_after) {
+    //   std::println("x\t{} ({} -> {})", score_before - score_after, score_before,
+    //                score_after);
+    // } else {
+    //   std::println("o\t{} ({} -> {})", score_before - score_after, score_before,
+    //                score_after);
+    // }
 
     return improved.facility;
   }

@@ -125,6 +125,13 @@ class SimulatedAnnealing {
     }
   }
 
+  double get_spent_ratio(std::chrono::nanoseconds spent,
+                         std::chrono::nanoseconds total) {
+    return std::chrono::duration_cast<std::chrono::duration<double, std::nano>>(
+               spent) /
+           total;
+  }
+
  public:
   explicit SimulatedAnnealing(const Problem& problem,
                               SimulatedAnnealingConfig config)
@@ -156,7 +163,7 @@ class SimulatedAnnealing {
   // Note: returned solution may not be feasible.
   Solution solve(const Solution& initial_solution, C cooling,
                  double infeasibility_penalty,
-                 const timing::Deadline deadline) {
+                 const std::chrono::nanoseconds duration) {
     if (actions_.empty()) {
       throw std::runtime_error("No actions are available.");
     }
@@ -184,20 +191,21 @@ class SimulatedAnnealing {
 
     InfeasibilityController infeasibility(infeasibility_penalty);
 
-    size_t iterations_per_temperature = 100;
-    size_t iterations_until_change = iterations_per_temperature;
+    constexpr size_t temperature_update_period = 100;
+    size_t iteration = 0;
+    double temperature = cooling.get_temperature(0);
 
     using Duration = std::chrono::duration<double, std::nano>;
     using Clock = std::chrono::steady_clock;
 
-    auto iteration_start = Clock::now();
+    auto start = Clock::now();
 
     while (true) {
       const size_t chosen_action = get_random_action_type();
 
       InternalStateDTO state_dto{
           .solution = state,
-          .temperature = cooling.get_temperature(),
+          .temperature = temperature,
           .infeasibility_penalty = infeasibility.get_penalty(),
           .random = random_,
           .changes_count = changes_count,
@@ -207,13 +215,15 @@ class SimulatedAnnealing {
 
       ++actions_stats[chosen_action].proposed_transitions;
       if (gain) {
+        // std::cout << gain->score << " " << gain->infeasibility << " " << temperature << std::endl;
+
         ++changes_count;
         ++actions_stats[chosen_action].accepted_transitions;
 
         current_score -= gain->score;
         current_infeasibility -= gain->infeasibility;
 
-        infeasibility.update(current_infeasibility, cooling.get_temperature());
+        infeasibility.update(current_infeasibility, temperature);
 
         // Score and infeasibility are updated incrementally.
         // If any action contains error in gain calculation, all further
@@ -234,56 +244,21 @@ class SimulatedAnnealing {
         }
       }
 
-      if (iterations_until_change == 0) {
-        const auto remaining_temperatures = cooling.advance();
-
-        if (!remaining_temperatures) {
-          break;
-        }
-
+      if ((iteration + 1) % temperature_update_period == 0) {
         const auto now = Clock::now();
+        const double ratio = get_spent_ratio(now - start, duration);
 
-        const Duration remaining_time =
-            std::chrono::duration_cast<Duration>(deadline.remaining_time());
-        const Duration average_iteration_time =
-            Duration(now - iteration_start) / iterations_per_temperature;
-
-        if (remaining_time < std::chrono::milliseconds{1}) {
+        if (ratio > 1.) {
           break;
         }
 
-        iterations_until_change = iterations_per_temperature =
-            remaining_time / average_iteration_time /
-            (*remaining_temperatures + 1);
-
-        iteration_start = now;
-
-        if (config.log_iteration_end) {
-          std::println(
-              "  # iterations = {} (average itr time = {}), score = {}, "
-              "inf = "
-              "{}, coef = "
-              "{}, T = {}",
-              iterations_until_change, average_iteration_time, current_score,
-              current_infeasibility, infeasibility.get_penalty(),
-              cooling.get_temperature());
-
-          std::println("  iteration acceptance rates:");
-          for (size_t i = 0; i < actions_.size(); ++i) {
-            std::println("  - {}: {} (accepted: {}, proposed: {})",
-                         actions_[i].name,
-                         actions_stats[i].get_acceptance_rate(),
-                         actions_stats[i].accepted_transitions,
-                         actions_stats[i].proposed_transitions);
-          }
-        }
-
-        // reset actions statistics
-        actions_stats = std::vector<ActionTypeStats>(actions_.size());
+        temperature = cooling.get_temperature(ratio);
       }
 
-      --iterations_until_change;
+      ++iteration;
     }
+
+    // std::cout << "-------- end: " << changes_count << " " << iteration << std::endl;
 
     return best.solution;
   }

@@ -64,11 +64,11 @@ class AngryCustomers {
 
   // Returns assigned facility for each customer, solution may be infeasible.
   std::vector<size_t> grow(std::vector<bool> individual) {
-    // auto itr = grow_cache_.find(individual);
+    auto itr = grow_cache_.find(individual);
 
-    // if (itr != grow_cache_.end()) {
-    // return itr->second;
-    // }
+    if (itr != grow_cache_.end()) {
+      return itr->second;
+    }
 
     const auto [n, d] = problem.shape();
 
@@ -143,16 +143,108 @@ class AngryCustomers {
   }
 
   std::vector<bool> mutation(std::vector<bool> individual, bool is_feasible) {
-    const double closing_prob = 0.05;
-    const double opening_prob = is_feasible ? 0.04 : 0.1;
+    size_t mutation_type = std::discrete_distribution<size_t>({1, 1, 5})(random_);
 
-    for (size_t i = 0; i < individual.size(); ++i) {
-      if (individual[i] && rnd::bernoulli(closing_prob, random_)) {
-        individual[i] = false;
-      } else if (!individual[i] && rnd::bernoulli(opening_prob, random_)) {
-        individual[i] = true;
+    if (mutation_type == 0) {
+      // close facility
+      size_t opened_count = 0;
+
+      for (size_t i = 0; i < individual.size(); ++i) {
+        if (individual[i]) {
+          ++opened_count;
+        }
+      }
+
+      size_t to_close_index = rnd::index(opened_count, random_);
+
+      for (size_t i = 0; i < individual.size(); ++i) {
+        if (individual[i]) {
+          if (to_close_index == 0) {
+            individual[i] = false;
+            break;
+          }
+
+          --to_close_index;
+        }
+      }
+    } else if (mutation_type == 1) {
+      // open facility
+      size_t closed_count = 0;
+
+      for (size_t i = 0; i < individual.size(); ++i) {
+        if (!individual[i]) {
+          ++closed_count;
+        }
+      }
+
+      size_t to_open_index = rnd::index(closed_count, random_);
+
+      for (size_t i = 0; i < individual.size(); ++i) {
+        if (!individual[i]) {
+          if (to_open_index == 0) {
+            individual[i] = true;
+            break;
+          }
+
+          --to_open_index;
+        }
+      }
+    } else {
+      // close one and open another
+      // close facility
+      size_t opened_count = 0;
+
+      for (size_t i = 0; i < individual.size(); ++i) {
+        if (individual[i]) {
+          ++opened_count;
+        }
+      }
+
+      size_t to_close_index = rnd::index(opened_count, random_);
+
+      for (size_t i = 0; i < individual.size(); ++i) {
+        if (individual[i]) {
+          if (to_close_index == 0) {
+            individual[i] = false;
+            break;
+          }
+
+          --to_close_index;
+        }
+      }
+
+      // open facility
+      size_t closed_count = 0;
+
+      for (size_t i = 0; i < individual.size(); ++i) {
+        if (!individual[i]) {
+          ++closed_count;
+        }
+      }
+
+      size_t to_open_index = rnd::index(closed_count, random_);
+
+      for (size_t i = 0; i < individual.size(); ++i) {
+        if (!individual[i]) {
+          if (to_open_index == 0) {
+            individual[i] = true;
+            break;
+          }
+
+          --to_open_index;
+        }
       }
     }
+    // const double closing_prob = 0.05;
+    // const double opening_prob = is_feasible ? 0.04 : 0.1;
+    //
+    // for (size_t i = 0; i < individual.size(); ++i) {
+    //   if (individual[i] && rnd::bernoulli(closing_prob, random_)) {
+    //     individual[i] = false;
+    //   } else if (!individual[i] && rnd::bernoulli(opening_prob, random_)) {
+    //     individual[i] = true;
+    //   }
+    // }
 
     // size_t index = rnd::index(individual.size(), random_);
     // individual[index] = !individual[index];
@@ -254,7 +346,8 @@ class AngryCustomers {
         params(params),
         improver_(problem) {}
 
-  Solution solve() {
+  // Returns all population sorted by score. The first one is the best.
+  std::vector<Solution> solve() {
     // Each individual is a choice of opened facilities
     std::vector<std::pair<Score, std::vector<bool>>> population;
 
@@ -334,12 +427,16 @@ class AngryCustomers {
     std::println("  total iterations = {}", iteration);
 
     // return the best from population
-    ArgMinimum<Score> best;
-    for (size_t i = 0; i < population.size(); ++i) {
-      best.record(i, population[i].first);
+    std::ranges::sort(population, {}, [](const auto& p) { return p.first; });
+
+    auto range = std::ranges::unique(population);
+
+    std::vector<Solution> result(population.size() - range.size());
+    for (size_t i = 0; i < population.size() - range.size(); ++i) {
+      result[i] = Solution{grow(std::move(population[i].second))};
     }
 
-    return Solution{grow(std::move(population[best->index].second))};
+    return result;
   }
 };
 

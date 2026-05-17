@@ -127,9 +127,9 @@ void solve(const std::string& problem_name) {
       .similarity_replacement_threshold = 2,
   };
 
-  auto solution = AngryCustomers<TwoOptImprover>(
-                      problem, timing::Deadline::after(60s), params)
-                      .solve();
+  auto solutions = AngryCustomers<TwoOptImprover>(
+                       problem, timing::Deadline::after(120s), params)
+                       .solve();
 
   auto annealing =
       annealing::SimulatedAnnealing<Problem, ProblemState, Solution,
@@ -139,12 +139,61 @@ void solve(const std::string& problem_name) {
   annealing.add<ChangeCustomerFacilityManager>("change_customer_facility", 90);
   annealing.add<SwapOpenedFacilityManager>("swap_opened_facility", 5);
 
-  const double initial_temperature = 500;
-  const double infeasibility_coef = initial_temperature;
+  const double initial_temperature = 1000;
+  const double infeasibility_coef = 100;
 
-  solution = annealing.solve(
-      solution, annealing::GeometricCooling(initial_temperature, 0.99, 100),
-      infeasibility_coef, timing::Deadline::after(60s));
+  auto solution = annealing.solve(
+      solutions[0], annealing::GeometricCooling(initial_temperature, 100),
+      infeasibility_coef, 60s);
+
+  // // try closing one facility
+  // // step 2
+  //
+  // // remove facility with the least demand
+  // std::vector<double> demands(problem.facilities.size(), 0);
+  //
+  // for (size_t i = 0; i < problem.customers.size(); ++i) {
+  //   demands[solution.facility[i]] += problem.customers[i].demand;
+  // }
+  //
+  // ArgMinimum<double> least_demand;
+  // std::vector<size_t> opened;
+  //
+  // for (size_t i = 0; i < problem.facilities.size(); ++i) {
+  //   if (demands[i] > 0) {
+  //     opened.push_back(i);
+  //     least_demand.record(i, demands[i]);
+  //   }
+  // }
+  //
+  // std::println("Stage 2: opened size = {}", opened.size());
+  //
+  // std::erase(opened, least_demand->index);
+  //
+  // std::default_random_engine random;
+  // for (size_t i = 0; i < problem.customers.size(); ++i) {
+  //   if (solution.facility[i] == least_demand->index) {
+  //     solution.facility[i] = opened[rnd::index(opened.size(), random)];
+  //   }
+  // }
+  //
+  // {
+  //   auto annealing = annealing::SimulatedAnnealing<Problem, ProblemState,
+  //                                                  Solution, SolutionState,
+  //                                                  annealing::GeometricCooling>(
+  //       problem, config);
+  //
+  //   annealing.add<ChangeCustomerFacilityManager>("change_customer_facility",
+  //                                                90);
+  //   annealing.add<SwapOpenedFacilityManager>("swap_opened_facility", 5);
+  //
+  //   constexpr double initial_temperature = 1000;
+  //   constexpr double infeasibility_coef = 500;
+  //
+  //   solution = annealing.solve(
+  //       solution, annealing::GeometricCooling(initial_temperature, 0.99,
+  //       100), infeasibility_coef, timing::Deadline::after(15s));
+  // }
 
   auto evaluation = evaluate(problem, solution);
   if (!evaluation.is_valid) {

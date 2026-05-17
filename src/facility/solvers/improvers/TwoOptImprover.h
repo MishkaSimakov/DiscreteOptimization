@@ -82,42 +82,42 @@ class TwoOptImprover {
         }
 
         // try to change facility
-        const size_t f1 = solution[i];
-        for (size_t f2 : facilities_near[i]) {
-          if (demands[f2] < 1e-10) {
-            // facility is closed
-            continue;
-          }
-
-          double score_gain =
-              distance(customers[i].position, facilities[f1].position) -
-              distance(customers[i].position, facilities[f2].position);
-
-          const double new_demand_f1 = demands[f1] - customers[i].demand;
-          const double new_demand_f2 = demands[f2] + customers[i].demand;
-
-          if (new_demand_f1 < 1e-10) {
-            score_gain += problem.facilities[f1].cost;
-          }
-
-          const double infeasibility_gain =
-              std::max(demands[f1] - facilities[f1].capacity, 0.) +
-              std::max(demands[f2] - facilities[f2].capacity, 0.) -
-              std::max(new_demand_f1 - facilities[f1].capacity, 0.) -
-              std::max(new_demand_f2 - facilities[f2].capacity, 0.);
-
-          const double gain = score_gain + penalty * infeasibility_gain;
-          if (gain < 1e-10) {
-            continue;
-          }
-
-          demands[f1] = new_demand_f1;
-          demands[f2] = new_demand_f2;
-
-          solution[i] = f2;
-
-          changed = true;
-        }
+        // const size_t f1 = solution[i];
+        // for (size_t f2 : facilities_near[i]) {
+        //   if (demands[f2] < 1e-10) {
+        //     // facility is closed
+        //     continue;
+        //   }
+        //
+        //   double score_gain =
+        //       distance(customers[i].position, facilities[f1].position) -
+        //       distance(customers[i].position, facilities[f2].position);
+        //
+        //   const double new_demand_f1 = demands[f1] - customers[i].demand;
+        //   const double new_demand_f2 = demands[f2] + customers[i].demand;
+        //
+        //   if (new_demand_f1 < 1e-10) {
+        //     score_gain += problem.facilities[f1].cost;
+        //   }
+        //
+        //   const double infeasibility_gain =
+        //       std::max(demands[f1] - facilities[f1].capacity, 0.) +
+        //       std::max(demands[f2] - facilities[f2].capacity, 0.) -
+        //       std::max(new_demand_f1 - facilities[f1].capacity, 0.) -
+        //       std::max(new_demand_f2 - facilities[f2].capacity, 0.);
+        //
+        //   const double gain = score_gain + penalty * infeasibility_gain;
+        //   if (gain < 1e-10) {
+        //     continue;
+        //   }
+        //
+        //   demands[f1] = new_demand_f1;
+        //   demands[f2] = new_demand_f2;
+        //
+        //   solution[i] = f2;
+        //
+        //   changed = true;
+        // }
       }
     } while (changed && iteration < max_iterations);
   }
