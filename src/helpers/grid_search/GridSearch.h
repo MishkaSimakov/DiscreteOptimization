@@ -30,6 +30,8 @@ class GridSearch {
   size_t index_{0};
   std::filesystem::path output_directory_;
 
+  std::optional<size_t> max_threads_;
+
   static std::string stringify_config(const Configuration& config) {
     nlohmann::json json = config;
     return json.dump();
@@ -118,8 +120,17 @@ class GridSearch {
 
   void set_strategy(GridSearchStrategy strategy) { strategy_ = strategy; }
 
+  // std::nullopt means no limit on threads count
+  void set_max_threads(std::optional<size_t> max_threads) {
+    max_threads_ = max_threads;
+  }
+
   void start() {
-    const size_t threads_count = std::thread::hardware_concurrency();
+    size_t threads_count = std::thread::hardware_concurrency();
+
+    if (max_threads_) {
+      threads_count = std::min(threads_count, *max_threads_);
+    }
 
     std::println("Starting grid search.");
     std::println("configurations = {}", parameters_.configurations_count());

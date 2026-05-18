@@ -116,14 +116,14 @@ int main() {
   gridsearch::GridSearch<std::vector<double>> search(output_directory);
 
   // SA parameters
-  search.add_parameter("relative_start_temperature",
-                       {1e-5, 1e-4, 1e-3, 1e-2});
+  search.add_parameter("relative_start_temperature", {1e-5, 1e-4, 1e-3, 1e-2});
   search.add_parameter("infeasibility_penalty",
                        {50, 100, 150, 200, 250, 300, 400, 500});
   search.add_parameter("open_facility_weight", {0, 1, 2, 5, 10, 20, 50});
   search.add_parameter("swap_facility_weight", {0, 1, 2, 5, 10, 20, 50});
   search.add_parameter("close_facility_weight", {0, 1, 2, 5, 10, 20, 50});
 
+  search.set_max_threads(2);
   search.set_strategy(gridsearch::GridSearchStrategy::RANDOM);
   search.set_runner(runner);
 
