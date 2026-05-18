@@ -16,6 +16,7 @@ struct AngryCustomersParameters {
   double mutation_rate;
   double similarity_replacement_threshold;
 
+  bool use_grow_cache = false;
   bool log = true;
 };
 
@@ -136,7 +137,9 @@ class AngryCustomers {
 
     result = improver_.improve(std::move(result), std::move(current_demand));
 
-    grow_cache_.emplace(individual, result);
+    if (params.use_grow_cache) {
+      grow_cache_.emplace(individual, result);
+    }
 
     return std::move(result);
   }

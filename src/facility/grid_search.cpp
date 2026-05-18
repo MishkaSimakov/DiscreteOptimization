@@ -43,10 +43,11 @@ struct FacilitySolverConfig {
 Solution run_solver(const ProblemState& problem, FacilitySolverConfig config) {
   // first run genetics
   constexpr AngryCustomersParameters genetics_config{
-      .population_size = 100,
+      .population_size = 50,
       .mutation_rate = 0.5,
       .similarity_replacement_threshold = 2,
       .log = false,
+      .use_grow_cache = false,
   };
 
   auto solutions =
