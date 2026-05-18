@@ -3,6 +3,7 @@
 #include "Evaluator.h"
 #include "Output.h"
 #include "Reader.h"
+#include "common/annealing/DefaultLoggers.h"
 
 #include "helpers/Files.h"
 #include "helpers/Time.h"
@@ -50,8 +51,6 @@ void solve(const std::string& problem_name) {
   auto solution = solutions[0];
 
   constexpr annealing::SimulatedAnnealingConfig annealing_config{
-      .log_best = true,
-      .log_iteration_end = true,
       .verify_gain = true,
   };
 

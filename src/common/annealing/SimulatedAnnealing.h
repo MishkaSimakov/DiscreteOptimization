@@ -24,25 +24,8 @@
 namespace annealing {
 
 struct SimulatedAnnealingConfig {
-  bool log_best;
-  bool log_iteration_end;
   bool verify_gain;
 };
-
-template <typename ProblemState, typename SolutionState>
-void log_best(const LoggingContext<ProblemState, SolutionState>& context) {
-  if (context.best.infeasibility > 0) {
-    std::println("  [.] new best: {:.5f}\t(infeasibility = {})",
-                 context.best.score, context.best.infeasibility);
-  } else {
-    std::println("  [!] new best: {:.5f}\t(feasible)", context.best.score);
-  }
-}
-
-template <typename SolutionState, typename ProblemState>
-void log_state(const LoggingContext<SolutionState, ProblemState>& context) {
-  std::println("hello world!");
-}
 
 // Solves minimization problem with constraints.
 // Can operate in infeasible solution spaces.
@@ -118,8 +101,8 @@ class SimulatedAnnealing {
     }
   }
 
-  double get_spent_ratio(std::chrono::nanoseconds spent,
-                         std::chrono::nanoseconds total) {
+  static double get_spent_ratio(std::chrono::nanoseconds spent,
+                                std::chrono::nanoseconds total) {
     return std::chrono::duration_cast<std::chrono::duration<double, std::nano>>(
                spent) /
            total;

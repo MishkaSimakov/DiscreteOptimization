@@ -17,8 +17,6 @@ namespace facility {
 
 class AnnealingImprover {
   constexpr static annealing::SimulatedAnnealingConfig log_config{
-      .log_best = false,
-      .log_iteration_end = false,
 #ifdef NDEBUG
       .verify_gain = false,
 #else
@@ -57,10 +55,12 @@ class AnnealingImprover {
     // auto score_after = get_score(problem, improved);
     //
     // if (score_before < score_after) {
-    //   std::println("x\t{} ({} -> {})", score_before - score_after, score_before,
+    //   std::println("x\t{} ({} -> {})", score_before - score_after,
+    //   score_before,
     //                score_after);
     // } else {
-    //   std::println("o\t{} ({} -> {})", score_before - score_after, score_before,
+    //   std::println("o\t{} ({} -> {})", score_before - score_after,
+    //   score_before,
     //                score_after);
     // }
 

@@ -35,8 +35,6 @@ Solution solve(const Problem& problem) {
   auto solution = solutions[0];
 
   constexpr annealing::SimulatedAnnealingConfig annealing_config{
-      .log_best = true,
-      .log_iteration_end = true,
       .verify_gain = false,
   };
 
