@@ -6,8 +6,8 @@
 
 namespace annealing {
 
-template <typename ProblemState, typename SolutionState>
-void log_best(const LoggingContext<ProblemState, SolutionState>& context) {
+template <typename Problem, typename Solution>
+void log_best(const LoggingContext<Problem, Solution>& context) {
   if (context.best.infeasibility > 0) {
     std::println("  [.] new best: {:.5f}\t(infeasibility = {})",
                  context.best.score, context.best.infeasibility);
@@ -16,8 +16,8 @@ void log_best(const LoggingContext<ProblemState, SolutionState>& context) {
   }
 }
 
-template <typename SolutionState, typename ProblemState>
-void log_state(const LoggingContext<SolutionState, ProblemState>& context) {
+template <typename Solution, typename Problem>
+void log_state(const LoggingContext<Solution, Problem>& context) {
   std::println("hello world!");
 }
 

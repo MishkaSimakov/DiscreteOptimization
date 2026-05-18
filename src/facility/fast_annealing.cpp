@@ -7,7 +7,7 @@
 #include "helpers/Files.h"
 #include "helpers/Time.h"
 
-#include "common/annealing/GeometricCooling.h"
+#include "../common/annealing/cooling/GeometricCooling.h"
 #include "common/annealing/SimulatedAnnealing.h"
 #include "helpers/grid_search/GridSearch.h"
 #include "solvers/AngryCustomers.h"

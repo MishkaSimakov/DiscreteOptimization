@@ -1,8 +1,8 @@
 #include <print>
 
+#include "common/annealing/cooling/LinearCooling.h"
 #include "Output.h"
-#include "common/annealing/GeometricCooling.h"
-#include "common/annealing/LinearCooling.h"
+#include "common/annealing/cooling/GeometricCooling.h"
 #include "common/annealing/SimulatedAnnealing.h"
 #include "helpers/Files.h"
 #include "helpers/Time.h"

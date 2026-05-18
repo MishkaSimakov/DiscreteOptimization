@@ -8,39 +8,39 @@
 
 namespace annealing {
 
-template <typename SolutionState>
+template <typename Solution>
 class ActionManagerBox {
  public:
   // Samples random action of this type, applies it with Simulated Annealing
   // probability model.
   virtual std::optional<ActionGain> try_apply(
-      InternalStateDTO<SolutionState> state) = 0;
+      InternalStateDTO<Solution> solution) = 0;
 
   // Samples random action of this type, and returns its gain.
-  virtual ActionGain get_gain(const SolutionState& solution) = 0;
+  virtual ActionGain get_gain(const Solution& solution) = 0;
 
   virtual void reset() = 0;
 
   virtual ~ActionManagerBox() = default;
 };
 
-template <typename M, typename ProblemState, typename SolutionState>
-  requires(ActionManager<M, ProblemState, SolutionState>)
-class ActionManagerBoxImpl final : public ActionManagerBox<SolutionState> {
+template <typename M, typename Problem, typename Solution>
+  requires(ActionManager<M, Problem, Solution>)
+class ActionManagerBoxImpl final : public ActionManagerBox<Solution> {
   // Optional used for manual lifetime control
   std::optional<M> manager_;
 
-  const ProblemState& problem_state_;
+  const Problem& problem_;
 
  public:
-  explicit ActionManagerBoxImpl(const ProblemState& state)
-      : manager_(state), problem_state_(state) {}
+  explicit ActionManagerBoxImpl(const Problem& problem)
+      : manager_(problem), problem_(problem) {}
 
   // Tries to apply given action to current solution state.
   // If successfully applied, returns gain and infeasibility gain. Otherwise,
   // returns std::nullopt.
   std::optional<ActionGain> try_apply(
-      InternalStateDTO<SolutionState> state) override {
+      InternalStateDTO<Solution> state) override {
     std::uniform_real_distribution<double> prob(0, 1);
 
     const SolverStateDTO shared_state{.changes_count = state.changes_count};
@@ -69,22 +69,22 @@ class ActionManagerBoxImpl final : public ActionManagerBox<SolutionState> {
     return std::nullopt;
   }
 
-  ActionGain get_gain(const SolutionState& state) override {
+  ActionGain get_gain(const Solution& solution) override {
     constexpr SolverStateDTO shared_state{.changes_count = 0};
 
     const std::optional<typename M::Action> action =
-        manager_->generate(state, shared_state);
+        manager_->generate(solution, shared_state);
 
     if (!action) {
       return ActionGain{0, 0};
     }
 
-    return manager_->get_gain(state, *action);
+    return manager_->get_gain(solution, *action);
   }
 
   void reset() override {
     manager_.reset();
-    manager_.emplace(problem_state_);
+    manager_.emplace(problem_);
   }
 };
 

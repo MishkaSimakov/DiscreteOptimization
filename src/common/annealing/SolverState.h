@@ -9,9 +9,9 @@ struct SolverStateDTO {
 };
 
 // This is private solver state, it is used in implementation
-template <typename SolutionState>
+template <typename Solution>
 struct InternalStateDTO {
-  SolutionState& solution;
+  Solution& solution;
   double temperature;
   double infeasibility_penalty;
   std::default_random_engine& random;

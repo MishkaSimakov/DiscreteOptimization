@@ -3,9 +3,9 @@
 #include <ranges>
 #include <string>
 
+#include "common/annealing/cooling/GeometricCooling.h"
 #include "Evaluator.h"
 #include "Reader.h"
-#include "common/annealing/GeometricCooling.h"
 #include "common/annealing/SimulatedAnnealing.h"
 
 #include "helpers/Files.h"

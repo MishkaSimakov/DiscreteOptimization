@@ -3,14 +3,14 @@
 #include <optional>
 #include <vector>
 
+#include "../../../common/annealing/cooling/GeometricCooling.h"
 #include "TwoOptImprover.h"
+#include "common/annealing/SimulatedAnnealing.h"
 #include "facility/Types.h"
 #include "facility/solvers/Neighborhood.h"
-
-#include "common/annealing/GeometricCooling.h"
-#include "common/annealing/SimulatedAnnealing.h"
 #include "facility/solvers/annealing/ChangeCustomerFacility.h"
 #include "facility/solvers/annealing/ProblemState.h"
+#include "facility/solvers/annealing/Scorer.h"
 #include "facility/solvers/annealing/SolutionState.h"
 
 namespace facility {
@@ -25,7 +25,7 @@ class AnnealingImprover {
   };
 
   const Problem& problem;
-  annealing::SimulatedAnnealing<Problem, ProblemState, Solution, SolutionState,
+  annealing::SimulatedAnnealing<ProblemState, SolutionState,
                                 annealing::GeometricCooling>
       annealing_;
 
@@ -33,7 +33,9 @@ class AnnealingImprover {
 
  public:
   explicit AnnealingImprover(const Problem& problem)
-      : problem(problem), annealing_(problem, log_config), two_opt(problem) {
+      : problem(problem),
+        annealing_(ProblemState(problem), log_config),
+        two_opt(problem) {
     annealing_.add<ChangeCustomerFacilityManager>("change_customer_facility",
                                                   1);
   }
@@ -48,7 +50,7 @@ class AnnealingImprover {
     // auto score_before = get_score(problem, solution);
 
     const auto improved = annealing_.solve(
-        Solution{std::move(solution)},
+        SolutionState(problem, Solution(solution)),
         annealing::GeometricCooling(start_temperature, start_temperature / 10),
         infeasibility_penalty, std::chrono::milliseconds{5});
 
@@ -64,7 +66,7 @@ class AnnealingImprover {
     //                score_after);
     // }
 
-    return improved.facility;
+    return improved.solution.facility;
   }
 };
 

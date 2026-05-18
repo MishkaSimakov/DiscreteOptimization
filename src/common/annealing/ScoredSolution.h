@@ -4,9 +4,9 @@ namespace annealing {
 
 // Score function calculation may be expensive. Therefore, solution is stored
 // with its score where it's possible.
-template <typename SolutionState>
+template <typename Solution>
 struct ScoredSolution {
-  SolutionState solution;
+  Solution solution;
   double score;
   double infeasibility;
 

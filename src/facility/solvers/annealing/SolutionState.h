@@ -26,22 +26,22 @@ struct SolutionState {
   // customers that belong to infeasible facilities
   std::vector<size_t> infeasible_customers;
 
-  SolutionState(const ProblemState& state, const Solution& solution)
-      : solution(solution), capacity(state.problem.facilities.size()) {
-    for (size_t i = 0; i < state.problem.facilities.size(); ++i) {
-      capacity[i] = state.problem.facilities[i].capacity;
+  SolutionState(const Problem& problem, const Solution& solution)
+      : solution(solution), capacity(problem.facilities.size()) {
+    for (size_t i = 0; i < problem.facilities.size(); ++i) {
+      capacity[i] = problem.facilities[i].capacity;
     }
 
     std::unordered_set<size_t> opened_set;
 
-    for (size_t i = 0; i < state.problem.customers.size(); ++i) {
-      capacity[solution.facility[i]] -= state.problem.customers[i].demand;
+    for (size_t i = 0; i < problem.customers.size(); ++i) {
+      capacity[solution.facility[i]] -= problem.customers[i].demand;
       opened_set.insert(solution.facility[i]);
     }
 
     opened = {opened_set.begin(), opened_set.end()};
 
-    for (size_t i = 0; i < state.problem.facilities.size(); ++i) {
+    for (size_t i = 0; i < problem.facilities.size(); ++i) {
       if (!opened_set.contains(i)) {
         closed.push_back(i);
       }

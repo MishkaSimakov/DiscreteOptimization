@@ -14,10 +14,10 @@
 #include "Acceptance.h"
 #include "ActionManager.h"
 #include "ActionManagerBox.h"
-#include "CoolingProcess.h"
 #include "InfeasibilityController.h"
 #include "LoggingContext.h"
 #include "ScoredSolution.h"
+#include "cooling/CoolingProcess.h"
 #include "helpers/Random.h"
 #include "helpers/Time.h"
 
@@ -33,24 +33,22 @@ struct SimulatedAnnealingConfig {
 // information.
 //  - SolutionState should store solution as well as some calculated
 // characteristics of it, that may be updated after action is applied.
-template <typename Problem, typename ProblemState, typename Solution,
-          typename SolutionState, CoolingProcess C>
+template <typename Problem, typename Solution, CoolingProcess C>
 class SimulatedAnnealing {
   struct ActionType {
     std::string name;
     double weight;
 
-    std::unique_ptr<ActionManagerBox<SolutionState>> box;
+    std::unique_ptr<ActionManagerBox<Solution>> box;
   };
 
-  const ProblemState problem_state;
+  const Problem problem;
   const SimulatedAnnealingConfig config;
 
   std::default_random_engine random_;
   std::vector<ActionType> actions_;
 
-  using Logger =
-      std::function<void(const LoggingContext<ProblemState, SolutionState>&)>;
+  using Logger = std::function<void(const LoggingContext<Problem, Solution>&)>;
   Logger log_best;
   Logger log_state;
 
@@ -85,16 +83,16 @@ class SimulatedAnnealing {
   }
 
   void assert_score_validity(
-      [[maybe_unused]] const ScoredSolution<SolutionState>& state) {
+      [[maybe_unused]] const ScoredSolution<Solution>& state) {
     if (config.verify_gain) {
       const double real_score =
-          get_score(problem_state.get_problem(), state.solution.get_solution());
+          get_score(problem.get_problem(), state.solution.get_solution());
       if (std::abs(real_score - state.score) > 1e-3) {
         throw std::runtime_error("Score gain is incorrect.");
       }
 
       const double real_infeasibility = get_infeasibility(
-          problem_state.get_problem(), state.solution.get_solution());
+          problem.get_problem(), state.solution.get_solution());
       if (std::abs(real_infeasibility - state.infeasibility) > 1e-3) {
         throw std::runtime_error("Infeasibility gain is incorrect.");
       }
@@ -111,7 +109,7 @@ class SimulatedAnnealing {
  public:
   explicit SimulatedAnnealing(const Problem& problem,
                               SimulatedAnnealingConfig config)
-      : problem_state(problem), config(config) {}
+      : problem(problem), config(config) {}
 
   // non copyable
   SimulatedAnnealing(const SimulatedAnnealing&) = delete;
@@ -121,14 +119,13 @@ class SimulatedAnnealing {
   SimulatedAnnealing(SimulatedAnnealing&&) = delete;
   SimulatedAnnealing& operator=(SimulatedAnnealing&&) = delete;
 
-  template <ActionManager<ProblemState, SolutionState> M>
+  template <ActionManager<Problem, Solution> M>
   void add(const std::string& name, double weight) {
     ActionType action{
         .name = name,
         .weight = weight,
-        .box = std::make_unique<
-            ActionManagerBoxImpl<M, ProblemState, SolutionState>>(
-            problem_state),
+        .box = std::make_unique<ActionManagerBoxImpl<M, Problem, Solution>>(
+            problem),
     };
 
     actions_.push_back(std::move(action));
@@ -153,15 +150,13 @@ class SimulatedAnnealing {
 
     std::unordered_map<std::string, ActionAcceptance> acceptances;
 
-    ScoredSolution<SolutionState> current{
-        .solution =
-            SolutionState(std::as_const(problem_state), initial_solution),
-        .score = get_score(problem_state.get_problem(), initial_solution),
-        .infeasibility =
-            get_infeasibility(problem_state.get_problem(), initial_solution),
+    ScoredSolution<Solution> current{
+        .solution = initial_solution,
+        .score = get_score(problem, initial_solution),
+        .infeasibility = get_infeasibility(problem, initial_solution),
     };
 
-    ScoredSolution<SolutionState> best = current;
+    ScoredSolution<Solution> best = current;
 
     // May be used to implement taboo list inside actions
     size_t changes_count = 0;
@@ -208,8 +203,8 @@ class SimulatedAnnealing {
           best = current;
 
           if (log_best) {
-            LoggingContext<ProblemState, SolutionState> context{
-                .problem = problem_state,
+            LoggingContext<Problem, Solution> context{
+                .problem = problem,
                 .current = current,
                 .best = best,
                 .temperature = temperature,
@@ -237,7 +232,7 @@ class SimulatedAnnealing {
       ++iteration;
     }
 
-    return best.solution.get_solution();
+    return best.solution;
   }
 
   // Randomly samples actions, and measures gain by applying them to @solution.
@@ -252,7 +247,7 @@ class SimulatedAnnealing {
       throw std::runtime_error("No actions are available.");
     }
 
-    SolutionState state(std::as_const(problem_state), solution);
+    Solution state(std::as_const(problem), solution);
 
     std::vector<double> alphas(samples);
     size_t positive_gain_count = 0;

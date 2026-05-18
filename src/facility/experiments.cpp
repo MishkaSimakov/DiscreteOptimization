@@ -8,9 +8,10 @@
 #include "helpers/Files.h"
 #include "helpers/Time.h"
 
-#include "common/annealing/GeometricCooling.h"
-#include "common/annealing/LinearCooling.h"
 #include "common/annealing/SimulatedAnnealing.h"
+#include "common/annealing/cooling/GeometricCooling.h"
+#include "common/annealing/cooling/LinearCooling.h"
+#include "facility/solvers/annealing/Scorer.h"
 #include "solvers/AngryCustomers.h"
 #include "solvers/Genetics.h"
 #include "solvers/Greedy.h"
@@ -54,10 +55,9 @@ void solve(const std::string& problem_name) {
       .verify_gain = true,
   };
 
-  auto annealing =
-      annealing::SimulatedAnnealing<Problem, ProblemState, Solution,
-                                    SolutionState, annealing::LinearCooling>(
-          problem, annealing_config);
+  auto annealing = annealing::SimulatedAnnealing<ProblemState, SolutionState,
+                                                 annealing::LinearCooling>(
+      ProblemState(problem), annealing_config);
 
   annealing.add<ChangeCustomerFacilityManager>("change_customer_facility", 90);
   annealing.add<SwapOpenedFacilityManager>("swap_opened_facility", 5);
@@ -68,9 +68,11 @@ void solve(const std::string& problem_name) {
   const double initial_temperature = 1e-4 * get_score(problem, solution);
   const double infeasibility_coef = 50;
 
-  solution = annealing.solve(
-      solution, annealing::LinearCooling(initial_temperature, 1e-5),
-      infeasibility_coef, 180s);
+  solution = annealing
+                 .solve(SolutionState(problem, solution),
+                        annealing::LinearCooling(initial_temperature, 1e-5),
+                        infeasibility_coef, 180s)
+                 .solution;
 
   auto evaluation = evaluate(problem, solution);
   if (!evaluation.is_valid) {

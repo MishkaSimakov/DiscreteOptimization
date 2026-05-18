@@ -8,12 +8,12 @@
 
 namespace annealing {
 
-template <typename ProblemState, typename SolutionState>
+template <typename Problem, typename Solution>
 struct LoggingContext {
-  const ProblemState& problem;
+  const Problem& problem;
 
-  const ScoredSolution<SolutionState>& current;
-  const ScoredSolution<SolutionState>& best;
+  const ScoredSolution<Solution>& current;
+  const ScoredSolution<Solution>& best;
 
   double temperature;
   double infeasibility_penalty;
