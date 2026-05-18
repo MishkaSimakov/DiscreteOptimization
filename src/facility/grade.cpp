@@ -12,6 +12,7 @@
 #include "solvers/AngryCustomers.h"
 #include "solvers/Greedy.h"
 #include "solvers/annealing/ChangeCustomerFacility.h"
+#include "solvers/annealing/CloseFacility.h"
 #include "solvers/annealing/OpenFacility.h"
 #include "solvers/annealing/ProblemState.h"
 #include "solvers/annealing/SolutionState.h"
@@ -39,20 +40,20 @@ Solution solve(const Problem& problem) {
       .verify_gain = false,
   };
 
-  auto annealing = annealing::SimulatedAnnealing<ProblemState, SolutionState,
-                                                 annealing::LinearCooling>(
+  auto annealing = annealing::SimulatedAnnealing<ProblemState, SolutionState>(
       ProblemState(problem), annealing_config);
 
   annealing.add<ChangeCustomerFacilityManager>("change_customer_facility", 90);
   annealing.add<SwapOpenedFacilityManager>("swap_opened_facility", 5);
   annealing.add<OpenFacilityManager>("open_facility", 1);
+  annealing.add<CloseFacilityManager>("close_facility", 1);
 
   const double initial_temperature = 1e-4 * get_score(problem, solution);
-  const double infeasibility_coef = 50;
+  const double infeasibility_coef = 200;
 
   return annealing
       .solve(SolutionState(problem, solution),
-             annealing::LinearCooling(initial_temperature, 1e-5),
+             annealing::LinearCooling(initial_temperature, 1),
              infeasibility_coef, 120s)
       .solution;
 }
