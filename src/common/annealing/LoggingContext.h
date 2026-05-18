@@ -17,6 +17,8 @@ struct LoggingContext {
 
   double temperature;
   double infeasibility_penalty;
+
+  size_t iterations_count;
   size_t changes_count;
 
   const std::unordered_map<std::string, ActionAcceptance>& acceptances;

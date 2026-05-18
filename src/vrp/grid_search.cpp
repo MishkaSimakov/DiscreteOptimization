@@ -26,7 +26,7 @@ const std::vector<std::string> graded_problems = {
     "vrp_101_10_1", "vrp_200_16_1", "vrp_421_41_1",
 };
 
-struct VRPSolverConfiguration {
+struct FacilitySolverConfig {
   double init_acceptance_rate;
   double infeasibility_penalty;
   double change_vehicle_weight;
@@ -35,7 +35,7 @@ struct VRPSolverConfiguration {
 
 Solution run_annealing(const Problem& problem, const Solution& initial_solution,
                        timing::Deadline deadline,
-                       VRPSolverConfiguration solver_config) {
+                       FacilitySolverConfig solver_config) {
   constexpr annealing::SimulatedAnnealingConfig log_settings{
       .log_best = false,
       .log_iteration_end = false,
@@ -63,7 +63,7 @@ Solution run_annealing(const Problem& problem, const Solution& initial_solution,
 }
 
 std::vector<double> runner(const gridsearch::Configuration& config) {
-  VRPSolverConfiguration solver_config{
+  FacilitySolverConfig solver_config{
       .init_acceptance_rate = config.at("init_acceptance_rate"),
       .infeasibility_penalty = config.at("infeasibility_penalty"),
       .change_vehicle_weight = config.at("change_vehicle_weight"),

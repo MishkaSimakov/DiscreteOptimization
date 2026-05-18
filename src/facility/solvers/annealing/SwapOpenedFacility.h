@@ -57,6 +57,10 @@ class SwapOpenedFacilityManager {
 
   std::optional<SwapOpenedFacilityAction> generate(const SolutionState& state,
                                                    annealing::SolverStateDTO) {
+    if (state.closed.empty()) {
+      return std::nullopt;
+    }
+
     const size_t opened = choose_opened_facility(state);
     const size_t closed = choose_closed_facility(state, opened);
 

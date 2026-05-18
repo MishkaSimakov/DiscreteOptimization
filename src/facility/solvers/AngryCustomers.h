@@ -15,6 +15,8 @@ struct AngryCustomersParameters {
   size_t population_size;
   double mutation_rate;
   double similarity_replacement_threshold;
+
+  bool log = true;
 };
 
 template <typename Improver>
@@ -404,14 +406,16 @@ class AngryCustomers {
 
       population[replaced] = std::move(replacement);
 
-      if (iteration % 100 == 0) {
+      if (params.log && iteration % 100 == 0) {
         const auto score = get_population_score(population);
         std::println("score = ({}, {}), diversity = {}", score.first,
                      score.second, get_population_diversity(population));
       }
     }
 
-    std::println("  total iterations = {}", iteration);
+    if (params.log) {
+      std::println("  total iterations = {}", iteration);
+    }
 
     // return sorted population
     std::ranges::sort(population, {},

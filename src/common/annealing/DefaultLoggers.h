@@ -18,7 +18,18 @@ void log_best(const LoggingContext<Problem, Solution>& context) {
 
 template <typename Solution, typename Problem>
 void log_state(const LoggingContext<Solution, Problem>& context) {
-  std::println("hello world!");
+  std::println(
+      "  # iterations = {}, current = ({}, {}), best = ({}, {}), T = {}",
+      context.iterations_count, context.current.infeasibility,
+      context.current.score, context.best.infeasibility, context.best.score,
+      context.temperature);
+
+  std::println("  acceptance rates:");
+  for (const auto& [name, acceptance] : context.acceptances) {
+    std::println("  - {}: {} (accepted: {}, proposed: {})", name,
+                 acceptance.get_rate(), acceptance.accepted_transitions,
+                 acceptance.proposed_transitions);
+  }
 }
 
 }  // namespace annealing

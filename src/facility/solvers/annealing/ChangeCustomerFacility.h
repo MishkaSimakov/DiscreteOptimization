@@ -1,7 +1,7 @@
 #pragma once
 
-#include <random>
 #include <optional>
+#include <random>
 
 #include "ProblemState.h"
 #include "SolutionState.h"

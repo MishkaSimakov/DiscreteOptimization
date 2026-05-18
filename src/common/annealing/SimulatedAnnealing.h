@@ -14,7 +14,6 @@
 #include "Acceptance.h"
 #include "ActionManager.h"
 #include "ActionManagerBox.h"
-#include "InfeasibilityController.h"
 #include "LoggingContext.h"
 #include "ScoredSolution.h"
 #include "cooling/CoolingProcess.h"
@@ -24,7 +23,7 @@
 namespace annealing {
 
 struct SimulatedAnnealingConfig {
-  bool verify_gain;
+  bool verify_gain = false;
 };
 
 // Solves minimization problem with constraints.
@@ -33,8 +32,11 @@ struct SimulatedAnnealingConfig {
 // information.
 //  - SolutionState should store solution as well as some calculated
 // characteristics of it, that may be updated after action is applied.
-template <typename Problem, typename Solution, CoolingProcess C>
+template <typename Problem, typename Solution>
 class SimulatedAnnealing {
+  // types
+  using Clock = std::chrono::steady_clock;
+
   struct ActionType {
     std::string name;
     double weight;
@@ -42,13 +44,18 @@ class SimulatedAnnealing {
     std::unique_ptr<ActionManagerBox<Solution>> box;
   };
 
+  using Logger = std::function<void(const LoggingContext<Problem, Solution>&)>;
+
+  // fields
   const Problem problem;
   const SimulatedAnnealingConfig config;
 
   std::default_random_engine random_;
   std::vector<ActionType> actions_;
 
-  using Logger = std::function<void(const LoggingContext<Problem, Solution>&)>;
+  constexpr static auto log_period = std::chrono::seconds{1};
+  Clock::time_point last_log_;
+
   Logger log_best;
   Logger log_state;
 
@@ -108,7 +115,7 @@ class SimulatedAnnealing {
 
  public:
   explicit SimulatedAnnealing(const Problem& problem,
-                              SimulatedAnnealingConfig config)
+                              SimulatedAnnealingConfig config = {})
       : problem(problem), config(config) {}
 
   // non copyable
@@ -137,6 +144,7 @@ class SimulatedAnnealing {
   // Returns the best found solution. Solutions are compared first by
   // infeasibility, then by score.
   // Note: returned solution may not be feasible.
+  template <CoolingProcess C>
   Solution solve(const Solution& initial_solution, C cooling,
                  double infeasibility_penalty,
                  const std::chrono::nanoseconds duration) {
@@ -161,14 +169,12 @@ class SimulatedAnnealing {
     // May be used to implement taboo list inside actions
     size_t changes_count = 0;
 
-    InfeasibilityController infeasibility(infeasibility_penalty);
-
     constexpr size_t temperature_update_period = 100;
     size_t iteration = 0;
     double temperature = cooling.get_temperature(0);
 
-    using Clock = std::chrono::steady_clock;
     const auto start = Clock::now();
+    last_log_ = start;
 
     while (true) {
       const size_t chosen_action = get_random_action_type();
@@ -176,7 +182,7 @@ class SimulatedAnnealing {
       InternalStateDTO state_dto{
           .solution = current.solution,
           .temperature = temperature,
-          .infeasibility_penalty = infeasibility.get_penalty(),
+          .infeasibility_penalty = infeasibility_penalty,
           .random = random_,
           .changes_count = changes_count,
       };
@@ -190,8 +196,6 @@ class SimulatedAnnealing {
 
         current.score -= gain->score;
         current.infeasibility -= gain->infeasibility;
-
-        infeasibility.update(current.infeasibility, temperature);
 
         // Score and infeasibility are updated incrementally.
         // If any action contains error in gain calculation, all further
@@ -209,6 +213,7 @@ class SimulatedAnnealing {
                 .best = best,
                 .temperature = temperature,
                 .infeasibility_penalty = infeasibility_penalty,
+                .iterations_count = iteration,
                 .changes_count = changes_count,
                 .acceptances = acceptances,
             };
@@ -227,6 +232,23 @@ class SimulatedAnnealing {
         }
 
         temperature = cooling.get_temperature(ratio);
+
+        if (log_state && now - last_log_ > log_period) {
+          last_log_ = now;
+
+          LoggingContext<Problem, Solution> context{
+              .problem = problem,
+              .current = current,
+              .best = best,
+              .temperature = temperature,
+              .infeasibility_penalty = infeasibility_penalty,
+              .iterations_count = iteration,
+              .changes_count = changes_count,
+              .acceptances = acceptances,
+          };
+
+          log_state(context);
+        }
       }
 
       ++iteration;

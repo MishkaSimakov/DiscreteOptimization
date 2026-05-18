@@ -17,6 +17,7 @@
 #include "solvers/Greedy.h"
 #include "solvers/Random.h"
 #include "solvers/annealing/ChangeCustomerFacility.h"
+#include "solvers/annealing/CloseFacility.h"
 #include "solvers/annealing/OpenFacility.h"
 #include "solvers/annealing/SolutionState.h"
 #include "solvers/annealing/SwapOpenedFacility.h"
@@ -28,7 +29,11 @@ using namespace facility;
 
 const std::vector<std::string> graded_problems = {
     // "fl_25_2",
-    "fl_100_1", "fl_200_7", "fl_500_7", "fl_1000_2", "fl_2000_2",
+    // "fl_100_1",
+    "fl_200_7",
+    "fl_500_7",
+    "fl_1000_2",
+    "fl_2000_2",
 };
 
 void solve(const std::string& problem_name) {
@@ -55,22 +60,23 @@ void solve(const std::string& problem_name) {
       .verify_gain = true,
   };
 
-  auto annealing = annealing::SimulatedAnnealing<ProblemState, SolutionState,
-                                                 annealing::LinearCooling>(
+  auto annealing = annealing::SimulatedAnnealing<ProblemState, SolutionState>(
       ProblemState(problem), annealing_config);
 
   annealing.add<ChangeCustomerFacilityManager>("change_customer_facility", 90);
   annealing.add<SwapOpenedFacilityManager>("swap_opened_facility", 5);
   annealing.add<OpenFacilityManager>("open_facility", 1);
+  annealing.add<CloseFacilityManager>("close_facility", 1);
 
   annealing.set_log_best(annealing::log_best<ProblemState, SolutionState>);
+  annealing.set_log_state(annealing::log_state<ProblemState, SolutionState>);
 
   const double initial_temperature = 1e-4 * get_score(problem, solution);
-  const double infeasibility_coef = 50;
+  const double infeasibility_coef = 200;
 
   solution = annealing
                  .solve(SolutionState(problem, solution),
-                        annealing::LinearCooling(initial_temperature, 1e-5),
+                        annealing::GeometricCooling(initial_temperature, 100),
                         infeasibility_coef, 180s)
                  .solution;
 

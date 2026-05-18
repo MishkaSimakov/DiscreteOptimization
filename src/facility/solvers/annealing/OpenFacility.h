@@ -31,13 +31,18 @@ class OpenFacilityManager {
   std::default_random_engine random_;
   std::vector<size_t> customers_;
 
+  const std::vector<std::vector<size_t>> facility_customer_neighborhood_;
+
   size_t choose_facility(const SolutionState& state) {
     return state.closed[rnd::index(state.closed.size(), random_)];
   }
 
  public:
   explicit OpenFacilityManager(const ProblemState& problem)
-      : state_(problem), customers_(problem.problem.customers.size()) {
+      : state_(problem),
+        customers_(problem.problem.customers.size()),
+        facility_customer_neighborhood_(
+            get_facility_customer_neighborhood(problem.problem, 20)) {
     assert(customers_.size() >= 10);
     std::iota(customers_.begin(), customers_.end(), 0);
   }
@@ -60,11 +65,11 @@ class OpenFacilityManager {
                           facility.position);
     };
 
-    std::ranges::sort(customers_, {}, distance_proj);
+    // std::ranges::sort(customers_, {}, distance_proj);
 
     double demand = 0;
 
-    for (const size_t i : customers_) {
+    for (const size_t i : facility_customer_neighborhood_[facility_index]) {
       const Customer& customer = state_.problem.customers[i];
 
       if (demand + customer.demand > facility.capacity) {

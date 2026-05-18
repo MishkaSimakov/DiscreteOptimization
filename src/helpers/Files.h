@@ -11,6 +11,10 @@ inline std::filesystem::path problem_path(std::string_view task_name,
   return std::filesystem::path(PATH_TO_TASKS) / task_name / problem_name;
 }
 
+inline std::filesystem::path output_path(const std::filesystem::path& path) {
+  return std::filesystem::path(PATH_TO_OUTPUT) / path;
+}
+
 inline std::filesystem::path solution_path(std::string_view task_name,
                                            std::string_view problem_name) {
   return std::filesystem::path(PATH_TO_OUTPUT) / task_name / problem_name;
