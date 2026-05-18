@@ -25,7 +25,8 @@ using namespace std::chrono_literals;
 using namespace facility;
 
 const std::vector<std::string> graded_problems = {
-    "fl_25_2", "fl_100_1", "fl_200_7", "fl_500_7", "fl_1000_2", "fl_2000_2",
+    // "fl_25_2",
+    "fl_100_1", "fl_200_7", "fl_500_7", "fl_1000_2", "fl_2000_2",
 };
 
 void solve(const std::string& problem_name) {
@@ -42,7 +43,7 @@ void solve(const std::string& problem_name) {
   };
 
   auto solutions = AngryCustomers<TwoOptImprover>(
-                       problem, timing::Deadline::after(120s), genetics_config)
+                       problem, timing::Deadline::after(5s), genetics_config)
                        .solve();
 
   // take only the best solution
@@ -61,13 +62,16 @@ void solve(const std::string& problem_name) {
 
   annealing.add<ChangeCustomerFacilityManager>("change_customer_facility", 90);
   annealing.add<SwapOpenedFacilityManager>("swap_opened_facility", 5);
+  annealing.add<OpenFacilityManager>("open_facility", 1);
+
+  annealing.set_log_best(annealing::log_best<ProblemState, SolutionState>);
 
   const double initial_temperature = 1e-4 * get_score(problem, solution);
   const double infeasibility_coef = 50;
 
   solution = annealing.solve(
       solution, annealing::LinearCooling(initial_temperature, 1e-5),
-      infeasibility_coef, 60s);
+      infeasibility_coef, 180s);
 
   auto evaluation = evaluate(problem, solution);
   if (!evaluation.is_valid) {

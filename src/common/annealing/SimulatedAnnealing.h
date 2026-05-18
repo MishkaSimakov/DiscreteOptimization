@@ -11,10 +11,13 @@
 #include <stdexcept>
 #include <tuple>
 
+#include "Acceptance.h"
 #include "ActionManager.h"
 #include "ActionManagerBox.h"
 #include "CoolingProcess.h"
 #include "InfeasibilityController.h"
+#include "LoggingContext.h"
+#include "ScoredSolution.h"
 #include "helpers/Random.h"
 #include "helpers/Time.h"
 
@@ -25,6 +28,21 @@ struct SimulatedAnnealingConfig {
   bool log_iteration_end;
   bool verify_gain;
 };
+
+template <typename ProblemState, typename SolutionState>
+void log_best(const LoggingContext<ProblemState, SolutionState>& context) {
+  if (context.best.infeasibility > 0) {
+    std::println("  [.] new best: {:.5f}\t(infeasibility = {})",
+                 context.best.score, context.best.infeasibility);
+  } else {
+    std::println("  [!] new best: {:.5f}\t(feasible)", context.best.score);
+  }
+}
+
+template <typename SolutionState, typename ProblemState>
+void log_state(const LoggingContext<SolutionState, ProblemState>& context) {
+  std::println("hello world!");
+}
 
 // Solves minimization problem with constraints.
 // Can operate in infeasible solution spaces.
@@ -42,27 +60,16 @@ class SimulatedAnnealing {
     std::unique_ptr<ActionManagerBox<SolutionState>> box;
   };
 
-  struct ActionTypeStats {
-    size_t proposed_transitions{0};
-    size_t accepted_transitions{0};
-
-    double get_acceptance_rate() const {
-      return static_cast<double>(accepted_transitions) /
-             static_cast<double>(proposed_transitions);
-    }
-  };
-
-  struct BestSolution {
-    Solution solution;
-    double score;
-    double infeasibility;
-  };
-
   const ProblemState problem_state;
   const SimulatedAnnealingConfig config;
 
   std::default_random_engine random_;
   std::vector<ActionType> actions_;
+
+  using Logger =
+      std::function<void(const LoggingContext<ProblemState, SolutionState>&)>;
+  Logger log_best;
+  Logger log_state;
 
   double get_total_actions_weight() const {
     double result = 0;
@@ -94,34 +101,20 @@ class SimulatedAnnealing {
     return actions_.size() - 1;
   }
 
-  void assert_score_validity([[maybe_unused]] const SolutionState& state,
-                             [[maybe_unused]] double score,
-                             [[maybe_unused]] double infeasibility) {
+  void assert_score_validity(
+      [[maybe_unused]] const ScoredSolution<SolutionState>& state) {
     if (config.verify_gain) {
       const double real_score =
-          get_score(problem_state.get_problem(), state.get_solution());
-      if (std::abs(real_score - score) > 1e-3) {
+          get_score(problem_state.get_problem(), state.solution.get_solution());
+      if (std::abs(real_score - state.score) > 1e-3) {
         throw std::runtime_error("Score gain is incorrect.");
       }
 
-      const double real_infeasibility =
-          get_infeasibility(problem_state.get_problem(), state.get_solution());
-      if (std::abs(real_infeasibility - infeasibility) > 1e-3) {
+      const double real_infeasibility = get_infeasibility(
+          problem_state.get_problem(), state.solution.get_solution());
+      if (std::abs(real_infeasibility - state.infeasibility) > 1e-3) {
         throw std::runtime_error("Infeasibility gain is incorrect.");
       }
-    }
-  }
-
-  void log_new_best(const BestSolution& best) const {
-    if (!config.log_best) {
-      return;
-    }
-
-    if (best.infeasibility > 0) {
-      std::println("  [.] new best: {:.5f}\t(infeasibility = {})", best.score,
-                   best.infeasibility);
-    } else {
-      std::println("  [!] new best: {:.5f}\t(feasible)", best.score);
     }
   }
 
@@ -158,6 +151,9 @@ class SimulatedAnnealing {
     actions_.push_back(std::move(action));
   }
 
+  void set_log_best(Logger logger) { log_best = logger; }
+  void set_log_state(Logger logger) { log_state = logger; }
+
   // Returns the best found solution. Solutions are compared first by
   // infeasibility, then by score.
   // Note: returned solution may not be feasible.
@@ -172,19 +168,17 @@ class SimulatedAnnealing {
       action.box->reset();
     }
 
-    std::vector<ActionTypeStats> actions_stats(actions_.size());
+    std::unordered_map<std::string, ActionAcceptance> acceptances;
 
-    SolutionState state(std::as_const(problem_state), initial_solution);
-    double current_score =
-        get_score(problem_state.get_problem(), initial_solution);
-    double current_infeasibility =
-        get_infeasibility(problem_state.get_problem(), initial_solution);
-
-    BestSolution best{
-        .solution = initial_solution,
-        .score = current_score,
-        .infeasibility = current_infeasibility,
+    ScoredSolution<SolutionState> current{
+        .solution =
+            SolutionState(std::as_const(problem_state), initial_solution),
+        .score = get_score(problem_state.get_problem(), initial_solution),
+        .infeasibility =
+            get_infeasibility(problem_state.get_problem(), initial_solution),
     };
+
+    ScoredSolution<SolutionState> best = current;
 
     // May be used to implement taboo list inside actions
     size_t changes_count = 0;
@@ -195,16 +189,14 @@ class SimulatedAnnealing {
     size_t iteration = 0;
     double temperature = cooling.get_temperature(0);
 
-    using Duration = std::chrono::duration<double, std::nano>;
     using Clock = std::chrono::steady_clock;
-
-    auto start = Clock::now();
+    const auto start = Clock::now();
 
     while (true) {
       const size_t chosen_action = get_random_action_type();
 
       InternalStateDTO state_dto{
-          .solution = state,
+          .solution = current.solution,
           .temperature = temperature,
           .infeasibility_penalty = infeasibility.get_penalty(),
           .random = random_,
@@ -213,34 +205,38 @@ class SimulatedAnnealing {
       const std::optional<ActionGain> gain =
           actions_[chosen_action].box->try_apply(state_dto);
 
-      ++actions_stats[chosen_action].proposed_transitions;
+      ++acceptances[actions_[chosen_action].name].proposed_transitions;
       if (gain) {
-        // std::cout << gain->score << " " << gain->infeasibility << " " << temperature << std::endl;
-
         ++changes_count;
-        ++actions_stats[chosen_action].accepted_transitions;
+        ++acceptances[actions_[chosen_action].name].accepted_transitions;
 
-        current_score -= gain->score;
-        current_infeasibility -= gain->infeasibility;
+        current.score -= gain->score;
+        current.infeasibility -= gain->infeasibility;
 
-        infeasibility.update(current_infeasibility, temperature);
+        infeasibility.update(current.infeasibility, temperature);
 
         // Score and infeasibility are updated incrementally.
         // If any action contains error in gain calculation, all further
         // actions will with incorrect score.
         // In debug, we are better off checking that the score remains valid.
-        assert_score_validity(state, current_score, current_infeasibility);
+        assert_score_validity(current);
 
-        if (current_infeasibility < best.infeasibility ||
-            current_infeasibility == best.infeasibility &&
-                current_score < best.score - 1e-5) {
-          best = BestSolution{
-              .solution = state.get_solution(),
-              .score = current_score,
-              .infeasibility = current_infeasibility,
-          };
+        if (current < best) {
+          best = current;
 
-          log_new_best(best);
+          if (log_best) {
+            LoggingContext<ProblemState, SolutionState> context{
+                .problem = problem_state,
+                .current = current,
+                .best = best,
+                .temperature = temperature,
+                .infeasibility_penalty = infeasibility_penalty,
+                .changes_count = changes_count,
+                .acceptances = acceptances,
+            };
+
+            log_best(context);
+          }
         }
       }
 
@@ -258,9 +254,7 @@ class SimulatedAnnealing {
       ++iteration;
     }
 
-    // std::cout << "-------- end: " << changes_count << " " << iteration << std::endl;
-
-    return best.solution;
+    return best.solution.get_solution();
   }
 
   // Randomly samples actions, and measures gain by applying them to @solution.

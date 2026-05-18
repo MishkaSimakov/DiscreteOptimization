@@ -11,6 +11,7 @@
 #include "solvers/AngryCustomers.h"
 #include "solvers/Greedy.h"
 #include "solvers/annealing/ChangeCustomerFacility.h"
+#include "solvers/annealing/OpenFacility.h"
 #include "solvers/annealing/ProblemState.h"
 #include "solvers/annealing/SolutionState.h"
 #include "solvers/annealing/SwapOpenedFacility.h"
@@ -36,7 +37,7 @@ Solution solve(const Problem& problem) {
   constexpr annealing::SimulatedAnnealingConfig annealing_config{
       .log_best = true,
       .log_iteration_end = true,
-      .verify_gain = true,
+      .verify_gain = false,
   };
 
   auto annealing =
@@ -46,13 +47,14 @@ Solution solve(const Problem& problem) {
 
   annealing.add<ChangeCustomerFacilityManager>("change_customer_facility", 90);
   annealing.add<SwapOpenedFacilityManager>("swap_opened_facility", 5);
+  annealing.add<OpenFacilityManager>("open_facility", 1);
 
   const double initial_temperature = 1e-4 * get_score(problem, solution);
   const double infeasibility_coef = 50;
 
   return annealing.solve(solution,
                          annealing::LinearCooling(initial_temperature, 1e-5),
-                         infeasibility_coef, 60s);
+                         infeasibility_coef, 120s);
 }
 
 int main(int argc, char** argv) {
