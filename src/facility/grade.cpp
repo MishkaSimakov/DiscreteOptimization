@@ -3,32 +3,56 @@
 #include "Evaluator.h"
 #include "Output.h"
 #include "Reader.h"
+#include "common/annealing/GeometricCooling.h"
+#include "common/annealing/LinearCooling.h"
+#include "common/annealing/SimulatedAnnealing.h"
 #include "helpers/Files.h"
 #include "helpers/Time.h"
 #include "solvers/AngryCustomers.h"
 #include "solvers/Greedy.h"
+#include "solvers/annealing/ChangeCustomerFacility.h"
+#include "solvers/annealing/ProblemState.h"
+#include "solvers/annealing/SolutionState.h"
+#include "solvers/annealing/SwapOpenedFacility.h"
+#include "solvers/improvers/TwoOptImprover.h"
 
 using namespace std::chrono_literals;
 using namespace facility;
 
 Solution solve(const Problem& problem) {
-  AngryCustomersParameters params{
+  constexpr AngryCustomersParameters genetics_config{
       .population_size = 100,
       .mutation_rate = 0.5,
       .similarity_replacement_threshold = 2,
   };
 
-  auto solution =
-      AngryCustomers(problem, timing::Deadline::after(30s), params).solve();
+  auto solutions = AngryCustomers<TwoOptImprover>(
+                       problem, timing::Deadline::after(120s), genetics_config)
+                       .solve();
 
-  std::println("finished genetics, starting SA...");
+  // take only the best solution
+  auto solution = solutions[0];
 
-  auto solver = SimulatedAnnealing(problem, timing::Deadline::after(10min));
+  constexpr annealing::SimulatedAnnealingConfig annealing_config{
+      .log_best = true,
+      .log_iteration_end = true,
+      .verify_gain = true,
+  };
 
-  solver.add<ChangeCustomerFacilityManager>("change_customer_facility", 0.9);
-  solver.add<SwapOpenedFacilityManager>("swap_opened_facility", 0.1);
+  auto annealing =
+      annealing::SimulatedAnnealing<Problem, ProblemState, Solution,
+                                    SolutionState, annealing::GeometricCooling>(
+          problem, annealing_config);
 
-  return solver.solve(solution);
+  annealing.add<ChangeCustomerFacilityManager>("change_customer_facility", 90);
+  annealing.add<SwapOpenedFacilityManager>("swap_opened_facility", 5);
+
+  const double initial_temperature = 1e-4 * get_score(problem, solution);
+  const double infeasibility_coef = 50;
+
+  return annealing.solve(solution,
+                         annealing::LinearCooling(initial_temperature, 1e-5),
+                         infeasibility_coef, 60s);
 }
 
 int main(int argc, char** argv) {
