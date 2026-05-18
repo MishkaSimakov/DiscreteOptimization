@@ -96,7 +96,7 @@ class GridSearch {
       return std::make_unique<SequentialGenerator>(parameters_);
     }
     if (strategy_ == GridSearchStrategy::RANDOM) {
-      if (parameters_.configurations_count() > 100'000) {
+      if (parameters_.configurations_count() > 40'000) {
         return std::make_unique<RandomGeneratorBig>(parameters_);
       }
 

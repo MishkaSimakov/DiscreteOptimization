@@ -37,6 +37,7 @@ struct FacilitySolverConfig {
   double open_facility_weight;
   double swap_facility_weight;
   double close_facility_weight;
+  bool is_linear_cooling;
 };
 
 Solution run_solver(const ProblemState& problem, FacilitySolverConfig config) {
@@ -72,8 +73,15 @@ Solution run_solver(const ProblemState& problem, FacilitySolverConfig config) {
       config.relative_start_temperature * get_score(problem, solution);
   const double infeasibility_penalty = config.infeasibility_penalty;
 
+  if (config.is_linear_cooling) {
+    return annealing
+        .solve(solution, annealing::LinearCooling(start_temperature, 1),
+               infeasibility_penalty, 60s)
+        .solution;
+  }
+
   return annealing
-      .solve(solution, annealing::LinearCooling(start_temperature, 1),
+      .solve(solution, annealing::GeometricCooling(start_temperature, 1),
              infeasibility_penalty, 60s)
       .solution;
 }
@@ -85,6 +93,7 @@ std::vector<double> runner(const gridsearch::Configuration& config) {
       .open_facility_weight = config.at("open_facility_weight"),
       .swap_facility_weight = config.at("swap_facility_weight"),
       .close_facility_weight = config.at("close_facility_weight"),
+      .is_linear_cooling = config.at("is_linear_cooling") > 0.5,
   };
 
   std::vector<double> scores;
@@ -116,12 +125,14 @@ int main() {
   gridsearch::GridSearch<std::vector<double>> search(output_directory);
 
   // SA parameters
-  search.add_parameter("relative_start_temperature", {1e-5, 1e-4, 1e-3, 1e-2});
+  search.add_parameter("relative_start_temperature",
+                       {5 * 1e-6, 1e-5, 5 * 1e-5, 1e-4, 5 * 1e-4, 1e-3, 1e-2});
   search.add_parameter("infeasibility_penalty",
-                       {50, 100, 150, 200, 250, 300, 400, 500});
+                       {50, 100, 150, 200, 250, 300, 350, 400, 450, 500});
   search.add_parameter("open_facility_weight", {0, 1, 2, 5, 10, 20, 50});
   search.add_parameter("swap_facility_weight", {0, 1, 2, 5, 10, 20, 50});
   search.add_parameter("close_facility_weight", {0, 1, 2, 5, 10, 20, 50});
+  search.add_parameter("is_linear_cooling", {0, 1});
 
   search.set_max_threads(2);
   search.set_strategy(gridsearch::GridSearchStrategy::RANDOM);
