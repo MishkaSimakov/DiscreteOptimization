@@ -27,7 +27,8 @@ class ChangeVehicleManager {
   explicit ChangeVehicleManager(const ProblemState& problem)
       : state_(problem) {}
 
-  std::optional<ChangeVehicleAction> generate(const SolutionState& solution) {
+  std::optional<ChangeVehicleAction> generate(const SolutionState& solution,
+                                              annealing::SolverStateDTO) {
     const size_t n = state_.problem.customers.size();
 
     const size_t customer = rnd::index(n, random_);
@@ -101,7 +102,8 @@ class ChangeVehicleManager {
     };
   }
 
-  void apply_action(SolutionState& solution, ChangeVehicleAction action) {
+  void apply_action(SolutionState& solution, ChangeVehicleAction action,
+                    annealing::SolverStateDTO) {
     const auto old_node = solution.customers[action.customer];
     const auto new_node = SolutionState::CustomerNode{
         .next = solution.customers[action.injection_position].next,

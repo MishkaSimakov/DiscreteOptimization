@@ -92,14 +92,13 @@ class SimulatedAnnealing {
   void assert_score_validity(
       [[maybe_unused]] const ScoredSolution<Solution>& state) {
     if (config.verify_gain) {
-      const double real_score =
-          get_score(problem.get_problem(), state.solution.get_solution());
+      const double real_score = get_score(problem, state.solution);
       if (std::abs(real_score - state.score) > 1e-3) {
         throw std::runtime_error("Score gain is incorrect.");
       }
 
-      const double real_infeasibility = get_infeasibility(
-          problem.get_problem(), state.solution.get_solution());
+      const double real_infeasibility =
+          get_infeasibility(problem, state.solution);
       if (std::abs(real_infeasibility - state.infeasibility) > 1e-3) {
         throw std::runtime_error("Infeasibility gain is incorrect.");
       }
@@ -269,15 +268,13 @@ class SimulatedAnnealing {
       throw std::runtime_error("No actions are available.");
     }
 
-    Solution state(std::as_const(problem), solution);
-
     std::vector<double> alphas(samples);
     size_t positive_gain_count = 0;
 
     for (size_t i = 0; i < samples; ++i) {
       const size_t action_type = get_random_action_type();
 
-      const ActionGain gain = actions_[action_type].box->get_gain(state);
+      const ActionGain gain = actions_[action_type].box->get_gain(solution);
 
       if (gain.score > -tolerance) {
         ++positive_gain_count;

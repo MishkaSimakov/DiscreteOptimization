@@ -7,7 +7,7 @@
 namespace vrp {
 
 struct SolutionState {
-  const size_t customers_count;
+  size_t customers_count;
 
   struct CustomerNode {
     size_t next;
@@ -18,13 +18,12 @@ struct SolutionState {
 
   std::vector<double> vehicle_demands;
 
-  SolutionState(const ProblemState& state, const Solution& initial_solution)
-      : customers_count(state.problem.customers.size()),
-        customers(state.problem.customers.size() +
-                  state.problem.vehicles_count),
-        vehicle_demands(state.problem.vehicles_count) {
-    for (size_t i = 0; i < state.problem.vehicles_count; ++i) {
-      const auto& route = initial_solution.routes[i];
+  SolutionState(const Problem& problem, const Solution& solution)
+      : customers_count(problem.customers.size()),
+        customers(problem.customers.size() + problem.vehicles_count),
+        vehicle_demands(problem.vehicles_count) {
+    for (size_t i = 0; i < problem.vehicles_count; ++i) {
+      const auto& route = solution.routes[i];
 
       // sentinel node
       const size_t sentinel_index = customers_count + i;
@@ -40,7 +39,7 @@ struct SolutionState {
             .prev = j == 0 ? sentinel_index : route[j - 1],
             .vehicle = i,
         };
-        vehicle_demands[i] += state.problem.customers[route[j]].demand;
+        vehicle_demands[i] += problem.customers[route[j]].demand;
       }
     }
   }

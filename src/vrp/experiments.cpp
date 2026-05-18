@@ -7,12 +7,12 @@
 #include "helpers/Files.h"
 #include "helpers/Time.h"
 
+#include "common/annealing/SimulatedAnnealing.h"
+#include "common/annealing/cooling/GeometricCooling.h"
 #include "solvers/Greedy.h"
 #include "solvers/Random.h"
-
-#include "common/annealing/cooling/GeometricCooling.h"
-#include "common/annealing/SimulatedAnnealing.h"
 #include "solvers/annealing/ChangeVehicle.h"
+#include "solvers/annealing/Evaluator.h"
 #include "solvers/annealing/ProblemState.h"
 #include "solvers/annealing/SolutionState.h"
 #include "solvers/annealing/TwoOpt.h"
@@ -53,15 +53,8 @@ void solve(const std::string& problem_name) {
   const double start_temperature = 1 * *average_distance;
   std::println("  T_start = {}", start_temperature);
 
-  constexpr annealing::SimulatedAnnealingConfig config{
-      .log_best = true,
-      .log_iteration_end = true,
-  };
-
-  auto annealing =
-      annealing::SimulatedAnnealing<Problem, ProblemState, Solution,
-                                    SolutionState, annealing::GeometricCooling>(
-          problem, timing::Deadline::after(60s), config);
+  auto annealing = annealing::SimulatedAnnealing<ProblemState, SolutionState>(
+      ProblemState(problem));
 
   annealing.add<ChangeVehicleManager>("change_vehicle", 1);
   annealing.add<TwoOptManager>("2opt", 1);
@@ -69,9 +62,12 @@ void solve(const std::string& problem_name) {
   const double infeasibility_penalty = start_temperature * 0.75;
 
   const auto solution =
-      annealing.solve(initial_solution,
-                      annealing::GeometricCooling(start_temperature, 0.98, 100),
-                      infeasibility_penalty);
+      annealing
+          .solve(SolutionState(problem, initial_solution),
+                 annealing::GeometricCooling(start_temperature,
+                                             0.13 * start_temperature),
+                 infeasibility_penalty, 120s)
+          .get_solution();
 
   auto evaluation = evaluate(problem, solution);
   if (!evaluation.is_valid) {

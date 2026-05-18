@@ -1,9 +1,9 @@
 #include <print>
 
-#include "common/annealing/cooling/LinearCooling.h"
 #include "Output.h"
-#include "common/annealing/cooling/GeometricCooling.h"
 #include "common/annealing/SimulatedAnnealing.h"
+#include "common/annealing/cooling/GeometricCooling.h"
+#include "common/annealing/cooling/LinearCooling.h"
 #include "helpers/Files.h"
 #include "helpers/Time.h"
 #include "solvers/Greedy.h"
@@ -29,25 +29,23 @@ void solve(const std::string& problem_name) {
   std::println("solving {}, #points = {}", path.filename().string(),
                problem.points.size());
 
-  auto initial_solution = Greedy(problem).solve();
+  const auto initial_solution = Greedy(problem).solve();
 
-  constexpr annealing::SimulatedAnnealingConfig log_config{
-      .log_best = true,
-      .log_iteration_end = true,
-  };
-  auto annealing =
-      annealing::SimulatedAnnealing<Problem, ProblemState, Solution,
-                                    SolutionState, annealing::GeometricCooling>(
-          problem, timing::Deadline::after(30s), log_config);
+  auto annealing = annealing::SimulatedAnnealing<ProblemState, SolutionState>(
+      ProblemState(problem));
 
   annealing.add<TwoOptActionManager>("2opt", 1);
 
-  const double start_temperature =
-      annealing.estimate_start_temperature(100'000, 0.5, initial_solution);
+  const double start_temperature = annealing.estimate_start_temperature(
+      100'000, 0.3, SolutionState(initial_solution));
 
-  const auto solution = annealing.solve(
-      initial_solution,
-      annealing::GeometricCooling(start_temperature, 0.95, 100), 0);
+  const auto solution =
+      annealing
+          .solve(SolutionState(initial_solution),
+                 annealing::GeometricCooling(start_temperature,
+                                             0.015 * start_temperature),
+                 0, 10min)
+          .get_solution();
 
   const auto evaluation = evaluate(problem, solution);
 

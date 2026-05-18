@@ -32,7 +32,7 @@ class TwoOptManager {
                   "because all candidates are neighbours.");
   }
 
-  std::optional<TwoOptAction> generate(const SolutionState& solution) {
+  std::optional<TwoOptAction> generate(const SolutionState& solution, annealing::SolverStateDTO) {
     const size_t n = state_.problem.customers.size();
 
     const size_t t1 = rnd::index(n, random_);
@@ -96,7 +96,7 @@ class TwoOptManager {
     };
   }
 
-  void apply_action(SolutionState& solution, TwoOptAction action) {
+  void apply_action(SolutionState& solution, TwoOptAction action, annealing::SolverStateDTO) {
     // reverse fragment from t4 to t2
     size_t current = action.t4;
     const size_t end = solution.customers[action.t2].prev;

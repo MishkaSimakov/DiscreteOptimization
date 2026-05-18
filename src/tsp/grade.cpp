@@ -1,8 +1,8 @@
 #include <print>
 
-#include "common/annealing/cooling/GeometricCooling.h"
 #include "Output.h"
 #include "common/annealing/SimulatedAnnealing.h"
+#include "common/annealing/cooling/GeometricCooling.h"
 #include "helpers/Files.h"
 #include "helpers/Time.h"
 #include "solvers/Genetics.h"
@@ -21,25 +21,18 @@ using namespace tsp;
 Solution solve(const Problem& problem) {
   const auto initial_solution = Greedy(problem).solve();
 
-  constexpr annealing::SimulatedAnnealingConfig log_config{
-      .log_best = true,
-      .log_iteration_end = true,
-  };
-
-  const auto deadline = timing::Deadline::after(10min);
-  auto annealing =
-      annealing::SimulatedAnnealing<Problem, ProblemState, Solution,
-                                    SolutionState, annealing::GeometricCooling>(
-          problem, deadline, log_config);
+  auto annealing = annealing::SimulatedAnnealing<ProblemState, SolutionState>(
+      ProblemState(problem));
 
   annealing.add<TwoOptActionManager>("2opt", 1);
 
   const double start_temperature =
-      annealing.estimate_start_temperature(100'000, 0.3, initial_solution);
+      annealing.estimate_start_temperature(100'000, 0.3, SolutionState(initial_solution));
 
   const auto sa_solution = annealing.solve(
-      initial_solution,
-      annealing::GeometricCooling(start_temperature, 0.96, 100), 0);
+      SolutionState(initial_solution),
+      annealing::GeometricCooling(start_temperature, 0.015 * start_temperature),
+      0, 10min).get_solution();
 
   std::println("{} -> {}", get_score(problem, initial_solution),
                get_score(problem, sa_solution));

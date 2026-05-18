@@ -31,7 +31,8 @@ class TwoOptActionManager {
                   "because all candidates are neighbours.");
   }
 
-  std::optional<TwoOptAction> generate(const SolutionState& solution) {
+  std::optional<TwoOptAction> generate(const SolutionState& solution,
+                                       annealing::SolverStateDTO) {
     const size_t n = state_.problem.points.size();
 
     const size_t t1 = rnd::index(n, random_);
@@ -88,7 +89,8 @@ class TwoOptActionManager {
     };
   }
 
-  void apply_action(SolutionState& state, TwoOptAction action) {
+  void apply_action(SolutionState& state, TwoOptAction action,
+                    annealing::SolverStateDTO) {
     state.tour.apply_2opt(action.t1, action.t2, action.t3);
   }
 };
