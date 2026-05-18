@@ -3,22 +3,59 @@
 #include "Evaluator.h"
 #include "Output.h"
 #include "Reader.h"
+#include "common/annealing/SimulatedAnnealing.h"
+#include "common/annealing/cooling/GeometricCooling.h"
+#include "common/annealing/cooling/LinearCooling.h"
+#include "facility/solvers/annealing/Scorer.h"
 #include "helpers/Files.h"
 #include "helpers/Time.h"
 #include "solvers/AngryCustomers.h"
 #include "solvers/Greedy.h"
+#include "solvers/annealing/ChangeCustomerFacility.h"
+#include "solvers/annealing/CloseFacility.h"
+#include "solvers/annealing/OpenFacility.h"
+#include "solvers/annealing/ProblemState.h"
+#include "solvers/annealing/SolutionState.h"
+#include "solvers/annealing/SwapOpenedFacility.h"
+#include "solvers/improvers/TwoOptImprover.h"
 
 using namespace std::chrono_literals;
 using namespace facility;
 
 Solution solve(const Problem& problem) {
-  GeneticsParameters params{
+  constexpr AngryCustomersParameters genetics_config{
       .population_size = 100,
       .mutation_rate = 0.5,
       .similarity_replacement_threshold = 2,
   };
 
-  return AngryCustomers(problem, timing::Deadline::after(60s), params).solve();
+  auto solutions = AngryCustomers<TwoOptImprover>(
+                       problem, timing::Deadline::after(120s), genetics_config)
+                       .solve();
+
+  // take only the best solution
+  auto solution = solutions[0];
+
+  constexpr annealing::SimulatedAnnealingConfig annealing_config{
+      .verify_gain = false,
+  };
+
+  auto annealing = annealing::SimulatedAnnealing<ProblemState, SolutionState>(
+      ProblemState(problem), annealing_config);
+
+  annealing.add<ChangeCustomerFacilityManager>("change_customer_facility", 90);
+  annealing.add<SwapOpenedFacilityManager>("swap_opened_facility", 5);
+  annealing.add<OpenFacilityManager>("open_facility", 1);
+  annealing.add<CloseFacilityManager>("close_facility", 1);
+
+  const double initial_temperature = 1e-4 * get_score(problem, solution);
+  const double infeasibility_coef = 200;
+
+  return annealing
+      .solve(SolutionState(problem, solution),
+             annealing::LinearCooling(initial_temperature, 1),
+             infeasibility_coef, 120s)
+      .solution;
 }
 
 int main(int argc, char** argv) {

@@ -17,6 +17,9 @@ endfunction()
 
 function(add_experiments_target task_name)
     add_target(${task_name}_experiments ${task_name}/experiments.cpp)
+
+    target_compile_options(${task_name}_experiments PRIVATE -fsanitize=address)
+    target_link_options(${task_name}_experiments PRIVATE -fsanitize=address)
 endfunction()
 
 add_grade_target(setcover)
@@ -33,5 +36,7 @@ add_experiments_target(tsp)
 add_experiments_target(facility)
 add_experiments_target(vrp)
 
+add_target(facility_fast_annealing facility/fast_annealing.cpp)
+add_target(facility_gridsearch facility/grid_search.cpp)
 add_target(setcover_gridsearch setcover/grid_search.cpp)
 add_target(vrp_gridsearch vrp/grid_search.cpp)

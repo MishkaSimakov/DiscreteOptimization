@@ -3,17 +3,37 @@
 #include "Evaluator.h"
 #include "Output.h"
 #include "Reader.h"
+#include "common/annealing/DefaultLoggers.h"
+
 #include "helpers/Files.h"
 #include "helpers/Time.h"
+
+#include "common/annealing/SimulatedAnnealing.h"
+#include "common/annealing/cooling/GeometricCooling.h"
+#include "common/annealing/cooling/LinearCooling.h"
+#include "facility/solvers/annealing/Scorer.h"
 #include "solvers/AngryCustomers.h"
+#include "solvers/Genetics.h"
 #include "solvers/Greedy.h"
-#include "solvers/GreedyFacilities.h"
+#include "solvers/Random.h"
+#include "solvers/annealing/ChangeCustomerFacility.h"
+#include "solvers/annealing/CloseFacility.h"
+#include "solvers/annealing/OpenFacility.h"
+#include "solvers/annealing/SolutionState.h"
+#include "solvers/annealing/SwapOpenedFacility.h"
+#include "solvers/improvers/AnnealingImprover.h"
+#include "solvers/improvers/TwoOptImprover.h"
 
 using namespace std::chrono_literals;
 using namespace facility;
 
 const std::vector<std::string> graded_problems = {
-    "fl_25_2", "fl_100_1", "fl_200_7", "fl_500_7", "fl_1000_2", "fl_2000_2",
+    // "fl_25_2",
+    // "fl_100_1",
+    "fl_200_7",
+    "fl_500_7",
+    "fl_1000_2",
+    "fl_2000_2",
 };
 
 void solve(const std::string& problem_name) {
@@ -23,17 +43,42 @@ void solve(const std::string& problem_name) {
   std::println("solving {}, #facilities = {}, #customers = {}",
                path.filename().string(), problem.facilities.size(),
                problem.customers.size());
-
-  // auto solution = Greedy(problem).solve();
-
-  GeneticsParameters params{
+  constexpr AngryCustomersParameters genetics_config{
       .population_size = 100,
       .mutation_rate = 0.5,
       .similarity_replacement_threshold = 2,
   };
 
-  auto solution =
-      AngryCustomers(problem, timing::Deadline::after(60s), params).solve();
+  auto solutions = AngryCustomers<TwoOptImprover>(
+                       problem, timing::Deadline::after(5s), genetics_config)
+                       .solve();
+
+  // take only the best solution
+  auto solution = solutions[0];
+
+  constexpr annealing::SimulatedAnnealingConfig annealing_config{
+      .verify_gain = true,
+  };
+
+  auto annealing = annealing::SimulatedAnnealing<ProblemState, SolutionState>(
+      ProblemState(problem), annealing_config);
+
+  annealing.add<ChangeCustomerFacilityManager>("change_customer_facility", 90);
+  annealing.add<SwapOpenedFacilityManager>("swap_opened_facility", 5);
+  annealing.add<OpenFacilityManager>("open_facility", 1);
+  annealing.add<CloseFacilityManager>("close_facility", 1);
+
+  annealing.set_log_best(annealing::log_best<ProblemState, SolutionState>);
+  annealing.set_log_state(annealing::log_state<ProblemState, SolutionState>);
+
+  const double initial_temperature = 1e-4 * get_score(problem, solution);
+  const double infeasibility_coef = 200;
+
+  solution = annealing
+                 .solve(SolutionState(problem, solution),
+                        annealing::GeometricCooling(initial_temperature, 100),
+                        infeasibility_coef, 180s)
+                 .solution;
 
   auto evaluation = evaluate(problem, solution);
   if (!evaluation.is_valid) {

@@ -1,145 +1,73 @@
 #pragma once
 
 #include <cassert>
-#include <map>
 #include <random>
 
-#include "Greedy.h"
 #include "facility/Types.h"
+#include "helpers/Hashers.h"
 #include "helpers/Random.h"
+#include "helpers/Time.h"
 #include "utils/Accumulators.h"
 
 namespace facility {
 
-struct GeneticsParameters {
+struct AngryCustomersParameters {
   size_t population_size;
   double mutation_rate;
   double similarity_replacement_threshold;
+
+  bool log = true;
 };
 
+template <typename Improver>
 class AngryCustomers {
+  // main types
+  using Individual = std::vector<bool>;
+
+  // (infeasibility, cost)
+  using Score = std::pair<double, double>;
+
+  struct ScoredIndividual {
+    Individual individual;
+    Score score;
+
+    bool operator==(const ScoredIndividual& other) const {
+      return individual == other.individual;
+    }
+  };
+
+  struct IndividualHasher {
+    size_t operator()(const Individual& individual) const {
+      StreamHasher hasher;
+
+      for (size_t i = 0; i < individual.size(); ++i) {
+        if (individual[i]) {
+          hasher << i;
+        }
+      }
+
+      return hasher.get_hash();
+    }
+  };
+
+  // fields
   const Problem& problem;
   const timing::Deadline deadline;
 
-  const GeneticsParameters params;
+  const AngryCustomersParameters params;
 
-  // For each customer stores the closest facility
-  const std::vector<size_t> closest;
-
+  Improver improver_;
   std::default_random_engine random_;
 
-  static std::vector<size_t> get_closest(const Problem& problem) {
-    const auto [n, d] = problem.shape();
+  std::unordered_map<Individual, std::vector<size_t>, IndividualHasher>
+      grow_cache_;
 
-    std::vector<size_t> closest(d);
-
-    for (size_t i = 0; i < d; ++i) {
-      ArgMinimum<double, std::less<>> min_distance;
-
-      for (size_t j = 0; j < n; ++j) {
-        min_distance.record(j, distance(problem.customers[i].position,
-                                        problem.facilities[j].position));
-      }
-
-      closest[i] = min_distance->index;
-    }
-
-    return closest;
+  Score get_score(const std::vector<size_t>& solution) const {
+    return {get_infeasibility(problem, solution),
+            facility::get_score(problem, solution)};
   }
 
-  std::vector<size_t> optimize_2opt(std::vector<size_t> solution,
-                                    std::vector<double> demands,
-                                    std::optional<size_t> max_iterations) {
-    const auto [n, d] = problem.shape();
-
-    const auto& customers = problem.customers;
-    const auto& facilities = problem.facilities;
-
-    bool changed;
-
-    size_t iteration = 0;
-
-    do {
-      ++iteration;
-
-      changed = false;
-
-      for (size_t i = 0; i < d; ++i) {
-        const double diff =
-            distance(customers[i].position, facilities[solution[i]].position) -
-            distance(customers[i].position, facilities[closest[i]].position);
-
-        // if customer is already connected to the closest facility, there is
-        // nothing we can do for him
-        if (diff < 1e-10) {
-          continue;
-        }
-
-        // otherwise, try to swap with someone
-        for (size_t j = 0; j < d; ++j) {
-          if (solution[i] == solution[j]) {
-            continue;
-          }
-
-          // try to change j-th customer facility to assigned_facility
-          if (demands[solution[i]] - customers[i].demand + customers[j].demand >
-              facilities[solution[i]].capacity) {
-            continue;
-          }
-
-          if (demands[solution[j]] + customers[i].demand - customers[j].demand >
-              facilities[solution[j]].capacity) {
-            continue;
-          }
-
-          const double gain =
-              distance(customers[i].position,
-                       facilities[solution[i]].position) +
-              distance(customers[j].position,
-                       facilities[solution[j]].position) -
-              distance(customers[i].position,
-                       facilities[solution[j]].position) -
-              distance(customers[j].position, facilities[solution[i]].position);
-
-          if (gain < 1e-10) {
-            continue;
-          }
-
-          demands[solution[i]] += customers[j].demand - customers[i].demand;
-          demands[solution[j]] += customers[i].demand - customers[j].demand;
-
-          // {
-          //   std::vector<size_t> order(facilities.size());
-          //   std::iota(order.begin(), order.end(), 0);
-          //
-          //   std::ranges::sort(order, {}, [&](size_t k) {
-          //     return distance(customers[i].position, facilities[k].position);
-          //   });
-          //
-          //   size_t index = 0;
-          //   for (size_t k = 0; k < facilities.size(); ++k) {
-          //     if (order[k] == solution[j]) {
-          //       index = k;
-          //       break;
-          //     }
-          //   }
-          //
-          //   std::println("  swapped: {}, {} (closest = {}, i = {}, index =
-          //   {}), gain = {}",
-          //                solution[i], solution[j], closest[i], i, index,
-          //                gain);
-          // }
-          std::swap(solution[i], solution[j]);
-
-          changed = true;
-        }
-      }
-    } while (changed && (!max_iterations || iteration < *max_iterations));
-
-    return solution;
-  }
-
-  std::vector<bool> get_initial_individual() {
+  Individual get_initial_individual() {
     const auto [n, d] = problem.shape();
 
     std::vector<bool> result(n);
@@ -151,69 +79,71 @@ class AngryCustomers {
     return result;
   }
 
-  // Returns fully grown individual and assigned facility for each customer
-  std::pair<std::vector<bool>, std::vector<size_t>> grow(
-      std::vector<bool> individual, std::optional<size_t> max_opt_iterations) {
+  // Returns assigned facility for each customer, solution may be infeasible.
+  std::vector<size_t> grow(Individual individual) {
+    auto itr = grow_cache_.find(individual);
+
+    if (itr != grow_cache_.end()) {
+      return itr->second;
+    }
+
     const auto [n, d] = problem.shape();
 
     std::vector<size_t> result(d, 0);
     std::vector<double> current_demand(n, 0);
 
+    std::vector<size_t> opened;
+    for (size_t i = 0; i < n; ++i) {
+      if (individual[i]) {
+        opened.push_back(i);
+      }
+    }
+
+    // choose the closest facility for each customer
     for (size_t i = 0; i < d; ++i) {
-      // try to assign facility without opening a new one
-      ArgMinimum<double, std::less<>> min_cost;
+      ArgMinimum<double> closest_feasible;
 
-      for (size_t j = 0; j < n; ++j) {
-        if (!individual[j]) {
-          continue;
-        }
-
-        if (current_demand[j] + problem.customers[i].demand >
+      for (size_t j : opened) {
+        if (current_demand[j] + problem.customers[i].demand <=
             problem.facilities[j].capacity) {
-          continue;
+          closest_feasible.record(
+              j, geom::distance_sqr(problem.customers[i].position,
+                                    problem.facilities[j].position));
         }
-
-        const double cost = distance(problem.customers[i].position,
-                                     problem.facilities[j].position);
-
-        min_cost.record(j, cost);
       }
 
-      if (min_cost.has_value()) {
-        result[i] = min_cost->index;
+      if (closest_feasible.has_value()) {
+        result[i] = closest_feasible->index;
         current_demand[result[i]] += problem.customers[i].demand;
-
         continue;
       }
 
-      // have to open new facility
-      for (size_t j = 0; j < n; ++j) {
-        if (current_demand[j] + problem.customers[i].demand >
-            problem.facilities[j].capacity) {
-          continue;
-        }
+      ArgMinimum<double> closest;
 
-        const double cost = distance(problem.customers[i].position,
-                                     problem.facilities[j].position);
-
-        min_cost.record(j, cost);
+      for (size_t j : opened) {
+        closest.record(j, geom::distance_sqr(problem.customers[i].position,
+                                             problem.facilities[j].position));
       }
 
-      individual[min_cost->index] = true;
-      result[i] = min_cost->index;
+      // if (rnd::bernoulli(0.95, random_)) {
+      result[i] = closest.has_value() ? closest->index : 0;
+      // } else {
+      // result[i] =
+      // opened.size() > 0 ? opened[rnd::index(opened.size(), random_)] : 0;
+      // }
       current_demand[result[i]] += problem.customers[i].demand;
     }
 
-    result =
-        optimize_2opt(std::move(result), current_demand, max_opt_iterations);
+    result = improver_.improve(std::move(result), std::move(current_demand));
 
-    return {std::move(individual), std::move(result)};
+    grow_cache_.emplace(individual, result);
+
+    return std::move(result);
   }
 
-  std::vector<bool> crossover(const std::vector<bool>& left,
-                              const std::vector<bool>& right) {
+  Individual crossover(const Individual& left, const Individual& right) {
     const auto [n, d] = problem.shape();
-    std::vector<bool> result(n);
+    Individual result(n);
 
     for (size_t i = 0; i < n; ++i) {
       if (left[i] && right[i]) {
@@ -228,12 +158,71 @@ class AngryCustomers {
     return result;
   }
 
-  std::vector<bool> mutation(std::vector<bool> individual) {
-    for (size_t i = 0; i < individual.size(); ++i) {
-      if (rnd::bernoulli(0.05, random_)) {
-        individual[i] = !individual[i];
+  Individual mutation(Individual individual, bool is_feasible) {
+    // 0 - close one random facility
+    // 1 - open one random facility
+    // 2 - 0 then 1
+    size_t mutation_type =
+        std::discrete_distribution<size_t>({1, 1, 5})(random_);
+
+    if (mutation_type == 0 || mutation_type == 2) {
+      // close facility
+      size_t opened_count = 0;
+
+      for (size_t i = 0; i < individual.size(); ++i) {
+        if (individual[i]) {
+          ++opened_count;
+        }
+      }
+
+      size_t to_close_index = rnd::index(opened_count, random_);
+
+      for (size_t i = 0; i < individual.size(); ++i) {
+        if (individual[i]) {
+          if (to_close_index == 0) {
+            individual[i] = false;
+            break;
+          }
+
+          --to_close_index;
+        }
       }
     }
+
+    if (mutation_type == 1 || mutation_type == 2) {
+      // open facility
+      size_t closed_count = 0;
+
+      for (size_t i = 0; i < individual.size(); ++i) {
+        if (!individual[i]) {
+          ++closed_count;
+        }
+      }
+
+      size_t to_open_index = rnd::index(closed_count, random_);
+
+      for (size_t i = 0; i < individual.size(); ++i) {
+        if (!individual[i]) {
+          if (to_open_index == 0) {
+            individual[i] = true;
+            break;
+          }
+
+          --to_open_index;
+        }
+      }
+    }
+
+    // const double closing_prob = 0.05;
+    // const double opening_prob = is_feasible ? 0.04 : 0.1;
+    //
+    // for (size_t i = 0; i < individual.size(); ++i) {
+    //   if (individual[i] && rnd::bernoulli(closing_prob, random_)) {
+    //     individual[i] = false;
+    //   } else if (!individual[i] && rnd::bernoulli(opening_prob, random_)) {
+    //     individual[i] = true;
+    //   }
+    // }
 
     // size_t index = rnd::index(individual.size(), random_);
     // individual[index] = !individual[index];
@@ -241,35 +230,30 @@ class AngryCustomers {
     return individual;
   }
 
-  size_t find_replaced(
-      const std::pair<double, std::vector<bool>>& replacement,
-      const std::vector<std::pair<double, std::vector<bool>>>& population) {
-    double best_score = 1e10;  // infinity
-
+  size_t find_replaced(const ScoredIndividual& replacement,
+                       const std::vector<ScoredIndividual>& population) {
+    Minimum<Score> best_score;
     ArgMinimum<double> min_distance;
 
     for (size_t i = 0; i < population.size(); ++i) {
-      best_score = std::min(best_score, population[i].first);
+      best_score.record(population[i].score);
 
       min_distance.record(
-          i, get_distance(replacement.second, population[i].second));
+          i, get_distance(replacement.individual, population[i].individual));
     }
 
     if (min_distance->min < params.similarity_replacement_threshold) {
       // similarity-based replacement
-      const size_t closest_index = min_distance->index;
-
-      if (std::abs(population[closest_index].first - best_score) > 1e-10 ||
-          replacement.first < population[closest_index].first) {
-        return closest_index;
+      if (replacement.score < population[min_distance->index].score) {
+        return min_distance->index;
       }
     }
 
     // return the worst one
-    ArgMaximum<double, std::less<>> worst_score;
+    ArgMaximum<Score> worst_score;
 
     for (size_t i = 0; i < population.size(); ++i) {
-      worst_score.record(i, population[i].first);
+      worst_score.record(i, population[i].score);
     }
 
     return worst_score->index;
@@ -289,13 +273,13 @@ class AngryCustomers {
   }
 
   static double get_population_diversity(
-      const std::vector<std::pair<double, std::vector<bool>>>& population) {
+      const std::vector<ScoredIndividual>& population) {
     size_t sum = 0;
     size_t count = 0;
 
     for (size_t i = 0; i < population.size(); ++i) {
       for (size_t j = i + 1; j < population.size(); ++j) {
-        sum += get_distance(population[i].second, population[j].second);
+        sum += get_distance(population[i].individual, population[j].individual);
         ++count;
       }
     }
@@ -303,19 +287,19 @@ class AngryCustomers {
     return static_cast<double>(sum) / static_cast<double>(count);
   }
 
-  static double get_population_score(
-      const std::vector<std::pair<double, std::vector<bool>>>& population) {
-    Minimum<double, std::less<>> min_score;
+  static Score get_population_score(
+      const std::vector<ScoredIndividual>& population) {
+    Minimum<Score> min_score;
 
-    for (const double s : population | std::views::keys) {
-      min_score.record(s);
+    for (const auto i : population) {
+      min_score.record(i.score);
     }
 
     return *min_score;
   }
 
   std::pair<size_t, size_t> choose_parents(
-      const std::vector<std::pair<double, std::vector<bool>>>& population) {
+      const std::vector<ScoredIndividual>& population) {
     size_t parent1 = 0;
 
     for (size_t i = 0; i + 1 < population.size(); ++i) {
@@ -333,26 +317,24 @@ class AngryCustomers {
 
  public:
   explicit AngryCustomers(const Problem& problem, timing::Deadline deadline,
-                          GeneticsParameters params)
+                          AngryCustomersParameters params)
       : problem(problem),
         deadline(deadline),
         params(params),
-        closest(get_closest(problem)) {}
+        improver_(problem) {}
 
-  Solution solve() {
-    constexpr size_t max_opt_iterations = 2;
-
-    // Each individual is a choice of opened facilities
-    std::vector<std::pair<double, std::vector<bool>>> population;
+  // Returns all population sorted by score. The first one is the best.
+  std::vector<Solution> solve() {
+    std::vector<ScoredIndividual> population;
 
     for (size_t i = 0; i < params.population_size; ++i) {
       auto individual = get_initial_individual();
+      const Score score = get_score(grow(individual));
 
-      auto [grown_individual, solution] =
-          grow(std::move(individual), max_opt_iterations);
-
-      population.emplace_back(get_score(problem, solution),
-                              std::move(grown_individual));
+      population.push_back(ScoredIndividual{
+          .individual = std::move(individual),
+          .score = score,
+      });
     }
 
     size_t iteration = 0;
@@ -360,17 +342,40 @@ class AngryCustomers {
     while (!deadline.is_over()) {
       ++iteration;
 
-      std::ranges::sort(population, {}, [](const auto& p) { return p.first; });
+      std::ranges::sort(population, {},
+                        [](const ScoredIndividual& i) { return i.score; });
+
+      const bool is_feasible = population[0].score.first == 0;
 
       if (iteration % 100 == 0) {
         // O, throw away the worser part of it,
         // And live the purer with the other half!
         // - Hamlet
 
-        // auto range = std::ranges::unique(population);
-        // std::println("  removed: {}", range.size());
+        auto range = std::ranges::unique(population);
 
         // replace the worst half of the population with random guys
+
+        const double replaced_ratio = 0.25;
+
+        const size_t remove_start = std::min(
+            static_cast<size_t>(population.size() * (1 - replaced_ratio)),
+            population.size() - range.size());
+
+        for (size_t i = remove_start; i < population.size(); ++i) {
+          auto individual = get_initial_individual();
+          const auto score = get_score(grow(individual));
+
+          population[i] = ScoredIndividual{
+              .individual = std::move(individual),
+              .score = score,
+          };
+        }
+
+        std::ranges::sort(population, {},
+                          [](const ScoredIndividual& i) { return i.score; });
+
+        // log results
         // for (size_t i = 0; i < population.size(); ++i) {
         //   for (bool v : population[i].second) {
         //     std::print("{}", v ? 1 : 0);
@@ -378,59 +383,52 @@ class AngryCustomers {
         //
         //   std::println(" - {}", population[i].first);
         // }
-
-        std::println("  replaced!");
-
-        const double replaced_ratio = 0.25;
-
-        for (size_t i = population.size() * (1 - replaced_ratio);
-             i < population.size(); ++i) {
-          auto [new_individual, solution] =
-              grow(get_initial_individual(), max_opt_iterations);
-
-          population[i] = {get_score(problem, solution),
-                           std::move(new_individual)};
-        }
       }
 
       // choose random parents
       const auto [p1, p2] = choose_parents(population);
 
       // construct child
-      auto child = crossover(population[p1].second, population[p2].second);
+      auto child =
+          crossover(population[p1].individual, population[p2].individual);
 
       if (rnd::bernoulli(params.mutation_rate, random_)) {
-        child = mutation(std::move(child));
+        child = mutation(std::move(child), is_feasible);
       }
 
-      auto [grown_child, solution] = grow(std::move(child), max_opt_iterations);
-
-      const double child_score = get_score(problem, solution);
-
       // replacement scheme
-      std::pair replacement = {child_score, std::move(grown_child)};
+      const auto score = get_score(grow(child));
+      ScoredIndividual replacement{
+          .individual = std::move(child),
+          .score = score,
+      };
       const size_t replaced = find_replaced(replacement, population);
 
       population[replaced] = std::move(replacement);
 
-      if (iteration % 20 == 0) {
-        std::println("score = {}, diversity = {}",
-                     get_population_score(population),
-                     get_population_diversity(population));
+      if (params.log && iteration % 100 == 0) {
+        const auto score = get_population_score(population);
+        std::println("score = ({}, {}), diversity = {}", score.first,
+                     score.second, get_population_diversity(population));
       }
     }
 
-    std::println("  total iterations = {}", iteration);
-
-    // return the best from population
-    ArgMinimum<double> best;
-    for (size_t i = 0; i < population.size(); ++i) {
-      best.record(i, population[i].first);
+    if (params.log) {
+      std::println("  total iterations = {}", iteration);
     }
 
-    auto [_, solution] =
-        grow(std::move(population[best->index].second), std::nullopt);
-    return Solution{solution};
+    // return sorted population
+    std::ranges::sort(population, {},
+                      [](const ScoredIndividual& i) { return i.score; });
+
+    auto range = std::ranges::unique(population);
+
+    std::vector<Solution> result(population.size() - range.size());
+    for (size_t i = 0; i < population.size() - range.size(); ++i) {
+      result[i] = Solution{grow(std::move(population[i].individual))};
+    }
+
+    return result;
   }
 };
 

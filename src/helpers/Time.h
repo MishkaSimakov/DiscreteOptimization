@@ -29,7 +29,7 @@ class Deadline {
 
   Duration remaining_time() const {
     if (Clock::now() >= deadline_) {
-      return Duration{0};
+      return std::chrono::nanoseconds{0};
     }
 
     return std::chrono::duration_cast<Duration>(deadline_ - Clock::now());

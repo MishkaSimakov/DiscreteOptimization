@@ -1,23 +1,26 @@
 #pragma once
+
+#include <optional>
 #include <utility>
 
 #include "ActionGain.h"
+#include "SolverState.h"
 
 namespace annealing {
 
-template <typename T, typename ProblemState, typename SolutionState>
+template <typename T, typename Problem, typename Solution>
 concept ActionManager =
-    requires(T manager, const ProblemState& problem_state, SolutionState state,
-             typename T::Action action) {
+    requires(T manager, const Problem& problem_state, Solution state,
+             SolverStateDTO shared_state, typename T::Action action) {
       T(problem_state);
 
       {
-        manager.generate(std::as_const(state))
+        manager.generate(std::as_const(state), shared_state)
       } -> std::same_as<std::optional<typename T::Action>>;
       {
         manager.get_gain(std::as_const(state), std::as_const(action))
       } -> std::same_as<ActionGain>;
-      manager.apply_action(state, action);
+      manager.apply_action(state, action, shared_state);
     };
 
 }  // namespace annealing

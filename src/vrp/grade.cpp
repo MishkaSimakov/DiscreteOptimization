@@ -9,7 +9,7 @@
 
 #include "solvers/Random.h"
 
-#include "common/annealing/GeometricCooling.h"
+#include "common/annealing/cooling/GeometricCooling.h"
 #include "common/annealing/SimulatedAnnealing.h"
 #include "solvers/annealing/ChangeVehicle.h"
 #include "solvers/annealing/ProblemState.h"

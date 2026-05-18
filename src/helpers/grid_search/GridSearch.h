@@ -47,6 +47,12 @@ class GridSearch {
     }
   }
 
+  static std::string get_filename(size_t index) {
+    const auto now = std::chrono::steady_clock::now().time_since_epoch();
+
+    return std::format("{}_{}.json", now.count(), index);
+  }
+
   void store_result(const Configuration& config,
                     std::expected<RunResult, std::string> result) {
     nlohmann::json json = config;
@@ -61,8 +67,7 @@ class GridSearch {
 
     std::lock_guard guard(mutex_);
 
-    const std::string filename = std::to_string(index_) + ".json";
-    std::ofstream output(output_directory_ / filename);
+    std::ofstream output(output_directory_ / get_filename(index_));
     if (!output) {
       throw std::runtime_error("Failed to open file for storing run result");
     }

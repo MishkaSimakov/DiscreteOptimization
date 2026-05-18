@@ -4,31 +4,20 @@
 #include <cmath>
 #include <vector>
 
+#include "helpers/Geometry.h"
 #include "helpers/Time.h"
 
 namespace facility {
 
-struct Point {
-  double x;
-  double y;
-};
-
-inline double distance(Point x, Point y) {
-  const double dx = x.x - y.x;
-  const double dy = x.y - y.y;
-
-  return std::sqrt(dx * dx + dy * dy);
-}
-
 struct Facility {
   double cost;
   double capacity;
-  Point position;
+  geom::Point<double> position;
 };
 
 struct Customer {
   double demand;
-  Point position;
+  geom::Point<double> position;
 };
 
 struct Problem {

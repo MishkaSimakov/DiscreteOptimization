@@ -18,7 +18,8 @@ class RandomGeneratorSmall final : public Generator {
 
  public:
   explicit RandomGeneratorSmall(const ParametersSpace& parameters)
-      : Generator(parameters) {
+      : Generator(parameters),
+        random_(std::chrono::steady_clock::now().time_since_epoch().count()) {
     auto sequence = SequentialGenerator(parameters);
 
     while (auto config = sequence.next()) {
