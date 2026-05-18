@@ -41,7 +41,7 @@ Solution solve(const Problem& problem) {
 
   auto annealing =
       annealing::SimulatedAnnealing<Problem, ProblemState, Solution,
-                                    SolutionState, annealing::GeometricCooling>(
+                                    SolutionState, annealing::LinearCooling>(
           problem, annealing_config);
 
   annealing.add<ChangeCustomerFacilityManager>("change_customer_facility", 90);

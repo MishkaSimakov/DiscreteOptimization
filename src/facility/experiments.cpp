@@ -25,12 +25,7 @@ using namespace std::chrono_literals;
 using namespace facility;
 
 const std::vector<std::string> graded_problems = {
-    "fl_25_2",
-    "fl_100_1",
-    "fl_200_7",
-    "fl_500_7",
-    "fl_1000_2",
-    "fl_2000_2",
+    "fl_25_2", "fl_100_1", "fl_200_7", "fl_500_7", "fl_1000_2", "fl_2000_2",
 };
 
 void solve(const std::string& problem_name) {
@@ -61,7 +56,7 @@ void solve(const std::string& problem_name) {
 
   auto annealing =
       annealing::SimulatedAnnealing<Problem, ProblemState, Solution,
-                                    SolutionState, annealing::GeometricCooling>(
+                                    SolutionState, annealing::LinearCooling>(
           problem, annealing_config);
 
   annealing.add<ChangeCustomerFacilityManager>("change_customer_facility", 90);

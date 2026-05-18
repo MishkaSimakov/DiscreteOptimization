@@ -405,9 +405,9 @@ class AngryCustomers {
       population[replaced] = std::move(replacement);
 
       if (iteration % 100 == 0) {
-        std::println("score = {}, diversity = {}",
-                     get_population_score(population),
-                     get_population_diversity(population));
+        const auto score = get_population_score(population);
+        std::println("score = ({}, {}), diversity = {}", score.first,
+                     score.second, get_population_diversity(population));
       }
     }
 
